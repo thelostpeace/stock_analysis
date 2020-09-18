@@ -7,8 +7,10 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
+from xgboost import XGBRegressor
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 from sklearn.utils.multiclass import type_of_target
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -19,6 +21,7 @@ import tushare as ts
 import datetime
 import argparse
 
+predict_days = 5
 
 def check_stock_data(name):
     files = glob.glob(name)
@@ -42,7 +45,9 @@ def get_stock_data(name, store_file):
         while True:
             tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
             print("get data length: %d, end_date: %s" % (len(tmp), end_date))
-            end_date = tmp.iloc[-1].trade_date
+            end_date = datetime.datetime.strptime(str(tmp.iloc[-1].trade_date), '%Y%m%d')
+            delta = datetime.timedelta(days=1)
+            end_data = (end_date - detla).strftime("%Y%m%d")
             data = data.append(tmp)
             if len(tmp) < 5000:
                 break
@@ -50,6 +55,99 @@ def get_stock_data(name, store_file):
     data.to_csv(store_file, index=False)
 
     return data
+
+def add_preday_info(data):
+    new_data = data.reset_index()
+    extend = pd.DataFrame()
+    pre_open = []
+    pre_high = []
+    pre_low = []
+    pre_change = []
+    pre_pct_chg = []
+    pre_vol = []
+    pre_amount = []
+
+    for idx in range(len(new_data) - 1):
+        pre_open.append(new_data.iloc[idx + 1].open)
+        pre_high.append(new_data.iloc[idx + 1].high)
+        pre_low.append(new_data.iloc[idx + 1].low)
+        pre_change.append(new_data.iloc[idx + 1].change)
+        pre_pct_chg.append(new_data.iloc[idx + 1].pct_chg)
+        pre_vol.append(new_data.iloc[idx + 1].vol)
+        pre_amount.append(new_data.iloc[idx + 1].amount)
+
+    pre_open.append(0.)
+    pre_high.append(0.)
+    pre_low.append(0.)
+    pre_change.append(0.)
+    pre_pct_chg.append(0.)
+    pre_vol.append(0.)
+    pre_amount.append(0.)
+
+    new_data['pre_open'] = pre_open
+    new_data['pre_high'] = pre_high
+    new_data['pre_low'] = pre_low
+    new_data['pre_change'] = pre_change
+    new_data['pre_pct_chg'] = pre_pct_chg
+    new_data['pre_vol'] = pre_vol
+    new_data['pre_amount'] = pre_amount
+
+    # fill predicting target
+    days = [[] for i in range(predict_days)]
+    for idx in range(predict_days - 1, len(new_data)):
+        for i in range(len(days)):
+            days[i].append(new_data.iloc[idx - i].pct_chg)
+
+    # fill invalid days with 0.
+    for i in range(len(days)):
+        for idx in range(predict_days - 1):
+            days[i].insert(0, 0.)
+
+    # extend pandas frame
+    for i in range(len(days)):
+        col = "pct_chg%d" % (i + 1)
+        new_data[col] = days[i]
+
+    return new_data
+
+def add_features(data):
+    new_data = add_preday_info(data)
+
+    return new_data
+
+class Model:
+    def __init__(self):
+        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount']
+        self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
+
+        self.params = {
+            'n_estimators': range(100, 1000, 100),
+            'max_depth': range(2, 10, 1),
+            'gamma': np.arange(0, 5, 0.5),
+            'min_child_weight': range(1, 10, 1),
+            'subsample': np.arange(0.6, 1, 0.1),
+            'colsample_bytree': np.arange(0.1, 1, 0.1)
+        }
+
+        self.xgb = XGBClassifier(learning_rate=0.02, objective='reg:squarederror', n_jobs=6)
+        self.models = []
+        for i in range(predict_days):
+            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=20, n_jobs=6, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
+            self.models.append(model)
+
+        self.days = predict_days
+
+    def train(self, data):
+        for i in range(self.days):
+            self.models[i].fit(data[self.features], data[self.targets[i]])
+
+    def predict(self, data):
+        pct_chg = []
+        for i in range(len(self.days)):
+            pct_chg.append(self.models[i].predict([data[self.features].iloc[0]]))
+
+        return pct_chg
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -63,3 +161,9 @@ if __name__ == "__main__":
     else:
         data = pd.read_csv(filename)
     data = data.dropna(axis=0)
+    print("data length: %d" % len(data))
+    data = add_features(data)
+
+    model = Model()
+    model.train(data.iloc[predict_days - 1:-1])
+    print(model.predict(data))
