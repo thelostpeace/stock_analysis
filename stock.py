@@ -129,10 +129,10 @@ class Model:
             'colsample_bytree': np.arange(0.1, 1, 0.1)
         }
 
-        self.xgb = XGBClassifier(learning_rate=0.02, objective='reg:squarederror', n_jobs=6)
+        self.xgb = XGBRegressor(learning_rate=0.02, objective='reg:squarederror', n_jobs=8)
         self.models = []
         for i in range(predict_days):
-            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=10, n_jobs=6, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
+            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=10, n_jobs=8, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
             self.models.append(model)
 
         self.days = predict_days
@@ -140,13 +140,14 @@ class Model:
     def train(self, data):
         for i in range(self.days):
             print("start training pct_chg%d data length: %d" % (i + 1, len(data)))
-            self.models[i].fit(data[self.features], data[self.targets[i]])
+            self.models[i].fit(data[self.features].to_numpy(), data[self.targets[i]].to_numpy())
             print("done training pct_chg%d data length: %d" % (i + 1, len(data)))
 
     def predict(self, data):
         pct_chg = []
-        for i in range(len(self.days)):
-            pct_chg.append(self.models[i].predict([data[self.features].iloc[0]]))
+        print("today:", data[self.features].iloc[0].to_frame())
+        for i in range(self.days):
+            pct_chg.append(self.models[i].predict(data[self.features].iloc[0].to_numpy().reshape(1, -1)))
 
         return pct_chg
 
