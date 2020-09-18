@@ -21,7 +21,7 @@ import tushare as ts
 import datetime
 import argparse
 
-predict_days = 1
+predict_days = 5
 
 def check_stock_data(name):
     files = glob.glob(name)
@@ -119,6 +119,7 @@ class Model:
     def __init__(self):
         self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount']
         self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
+        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount']
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
@@ -145,11 +146,27 @@ class Model:
 
     def predict(self, data):
         pct_chg = []
-        print("today:", data[self.features].iloc[0].to_frame())
+        print("today:", data[self.predict_features].iloc[0].to_frame())
         for i in range(self.days):
-            pct_chg.append(self.models[i].predict(data[self.features].iloc[0].to_numpy().reshape(1, -1)))
+            pct_chg.append(self.models[i].predict(data[self.predict_features].iloc[0].to_numpy().reshape(1, -1))[0])
 
         return pct_chg
+
+    def plot(self, data, days, stock):
+        dots = days + self.days
+        x = range(1, dots + 1)
+        y = [d for d in reversed(data.iloc[0:days]['close'].tolist())]
+        pct_chg = self.predict(data)
+        print(pct_chg)
+        print("last day close: %s" % y[-1])
+        for chg in pct_chg:
+            y.append(y[-1] * (1 + chg / 100))
+            print("predict: %s" % y[-1])
+
+        sns.lineplot(x=x, y=y)
+        sns.lineplot(x=x[:days], y=y[:days])
+        plt.savefig('%s.png' % stock)
+
 
 
 if __name__ == "__main__":
@@ -169,4 +186,5 @@ if __name__ == "__main__":
 
     model = Model()
     model.train(data.iloc[predict_days - 1:-1])
-    print(model.predict(data))
+    #print(model.predict(data))
+    model.plot(data, 30, args.stock)
