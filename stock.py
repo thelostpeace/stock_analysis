@@ -21,7 +21,7 @@ import tushare as ts
 import datetime
 import argparse
 
-predict_days = 5
+predict_days = 1
 
 def check_stock_data(name):
     files = glob.glob(name)
@@ -122,7 +122,7 @@ class Model:
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
-            'max_depth': range(2, 10, 1),
+            'max_depth': range(3, 7, 1),
             'gamma': np.arange(0, 5, 0.5),
             'min_child_weight': range(1, 10, 1),
             'subsample': np.arange(0.6, 1, 0.1),
@@ -132,14 +132,16 @@ class Model:
         self.xgb = XGBClassifier(learning_rate=0.02, objective='reg:squarederror', n_jobs=6)
         self.models = []
         for i in range(predict_days):
-            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=20, n_jobs=6, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
+            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=10, n_jobs=6, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
             self.models.append(model)
 
         self.days = predict_days
 
     def train(self, data):
         for i in range(self.days):
+            print("start training pct_chg%d data length: %d" % (i + 1, len(data)))
             self.models[i].fit(data[self.features], data[self.targets[i]])
+            print("done training pct_chg%d data length: %d" % (i + 1, len(data)))
 
     def predict(self, data):
         pct_chg = []
