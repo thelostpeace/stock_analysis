@@ -110,16 +110,51 @@ def add_preday_info(data):
 
     return new_data
 
+def add_ma_info(data):
+    new_data = data.reset_index()
+    days = [5, 10, 15, 20, 30, 50, 100, 200]
+    # add simple ma info
+    smas = [[] for i in range(len(days))]
+    count = 0
+    for day in days:
+        for idx in range(len(data) - day + 1):
+            smas[count].append(new_data.iloc[idx : idx + day].close.sum() / day)
+        count += 1
+
+    count = 0
+    for day in days:
+        for idx in range(day - 1):
+            smas[count].append(0.)
+        count += 1
+
+    for day, sma in zip(days, smas):
+        new_data['sma%d' % day] = sma
+
+    sma_cols = ["sma%d" % d for d in days]
+    pre_smas = [[] for i in range(len(sma_cols))]
+    count = 0
+    for col in sma_cols:
+        pre_smas[count] = new_data.iloc[1:][col].tolist()
+        pre_smas[count].append(0.)
+        count += 1
+
+    for col, pre_sma in zip(sma_cols, pre_smas):
+        new_data["pre_%s" % col] = pre_sma
+
+    return new_data
+
+
 def add_features(data):
     new_data = add_preday_info(data)
+    new_data = add_ma_info(new_data)
 
     return new_data
 
 class Model:
     def __init__(self):
-        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount']
+        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200']
         self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
-        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount']
+        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200']
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
@@ -130,10 +165,10 @@ class Model:
             'colsample_bytree': np.arange(0.1, 1, 0.1)
         }
 
-        self.xgb = XGBRegressor(learning_rate=0.02, objective='reg:squarederror', n_jobs=8)
+        self.xgb = XGBRegressor(learning_rate=0.02, objective='reg:squarederror', n_jobs=6)
         self.models = []
         for i in range(predict_days):
-            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=10, n_jobs=8, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
+            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=10, n_jobs=6, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
             self.models.append(model)
 
         self.days = predict_days
@@ -167,6 +202,15 @@ class Model:
         sns.lineplot(x=x[:days], y=y[:days])
         plt.savefig('%s.png' % stock)
 
+    def feature_importance(self):
+        count = 1
+        for model in self.models:
+            #print(model.best_estimator_.feature_importances_)
+            feature_map = list(zip(self.features, model.best_estimator_.feature_importances_))
+            fi = sorted(feature_map, key=lambda v : v[1], reverse=True)
+            fi = [v[0] for v in fi]
+            print("day%d percent change feature importance: %s" % (count, ' => '.join(fi)))
+            count += 1
 
 
 if __name__ == "__main__":
@@ -185,6 +229,7 @@ if __name__ == "__main__":
     data = add_features(data)
 
     model = Model()
-    model.train(data.iloc[predict_days - 1:-1])
+    model.train(data.iloc[predict_days - 1:-200])
     #print(model.predict(data))
     model.plot(data, 30, args.stock)
+    model.feature_importance()
