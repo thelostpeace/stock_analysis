@@ -141,6 +141,35 @@ def add_ma_info(data):
     for col, pre_sma in zip(sma_cols, pre_smas):
         new_data["pre_%s" % col] = pre_sma
 
+    # add exponential ma info
+    # scaling = s / (1 + d), s is smoothing, typically 2, d is ma days
+    # ema(t) = v * scaling + ema(t - 1) * (1 - scaling), v is time(t)'s price
+    emas = [[] for i in range(len(days))]
+    count = 0
+    for day in days:
+        scaling = 2. / (1 + day)
+        for idx in range(len(data) - 1, -1, -1):
+            if idx == len(data) - 1:
+                emas[count].append(new_data.iloc[idx].close)
+                continue
+            emas[count].append(new_data.iloc[idx].close * scaling + (1 - scaling) * emas[count][-1])
+        count += 1
+
+    for day, ema in zip(days, emas):
+        # reverse ema
+        new_data['ema%d' % day] = ema[-1::-1]
+
+    ema_cols = ['ema%d' % d for d in days]
+    pre_emas = [[] for i in range(len(days))]
+    count = 0
+    for col in ema_cols:
+        pre_emas[count] = new_data.iloc[1:][col].tolist()
+        pre_emas[count].append(0.)
+        count += 1
+
+    for col, pre_ema in zip(ema_cols, pre_emas):
+        new_data["pre_%s" % col] = pre_ema
+
     return new_data
 
 
@@ -152,9 +181,9 @@ def add_features(data):
 
 class Model:
     def __init__(self):
-        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200']
+        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200', 'pre_ema5', 'pre_ema10', 'pre_ema15', 'pre_ema20', 'pre_ema30', 'pre_ema50', 'pre_ema100', 'pre_ema200']
         self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
-        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200']
+        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200', 'ema5', 'ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200']
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
@@ -206,7 +235,7 @@ class Model:
         count = 1
         for model in self.models:
             #print(model.best_estimator_.feature_importances_)
-            feature_map = list(zip(self.features, model.best_estimator_.feature_importances_))
+            feature_map = list(zip(self.predict_features, model.best_estimator_.feature_importances_))
             fi = sorted(feature_map, key=lambda v : v[1], reverse=True)
             fi = [v[0] for v in fi]
             print("day%d percent change feature importance: %s" % (count, ' => '.join(fi)))
