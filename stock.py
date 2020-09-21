@@ -20,6 +20,7 @@ from sklearn.svm import LinearSVC
 import tushare as ts
 import datetime
 import argparse
+import math
 
 predict_days = 5
 
@@ -57,7 +58,7 @@ def get_stock_data(name, store_file):
     return data
 
 def add_preday_info(data):
-    new_data = data.reset_index()
+    new_data = data.reset_index(drop=True)
     extend = pd.DataFrame()
     pre_open = []
     pre_high = []
@@ -111,7 +112,7 @@ def add_preday_info(data):
     return new_data
 
 def add_ma_info(data):
-    new_data = data.reset_index()
+    new_data = data.reset_index(drop=True)
     days = [5, 10, 15, 20, 30, 50, 100, 200]
     # add simple ma info
     smas = [[] for i in range(len(days))]
@@ -172,18 +173,71 @@ def add_ma_info(data):
 
     return new_data
 
+def add_rsi_info(data):
+    new_data = data.reset_index(drop=True)
+    '''
+        RSI = 100 - 100 / (1 + RS)
+        RS = average up / average down
+        average up = sum(up moves) / N
+        average downn = sum(down moves) / N
+    '''
+    # calculate ups and downs
+    ups = []
+    downs = []
+    for idx in range(len(data) - 1):
+        if new_data.iloc[idx].close > new_data.iloc[idx + 1].close:
+            ups.append(new_data.iloc[idx].close - new_data.iloc[idx + 1].close)
+            downs.append(0.)
+        else:
+            ups.append(0.)
+            downs.append(new_data.iloc[idx + 1].close - new_data.iloc[idx].close)
+    ups.append(0.)
+    downs.append(0.)
+    # period of RSI
+    N = [2,3,4,5,6]
+    for n in N:
+        # calculate ema
+        up_emas = []
+        down_emas = []
+        scaling = 2. / (1 + n)
+        for idx in range(len(ups) - 1, -1, -1):
+            if idx == len(data) - 1:
+                up_emas.append(ups[-1])
+                down_emas.append(downs[-1])
+                continue
+            up_emas.append(ups[idx] * scaling + (1 - scaling) * up_emas[-1])
+            down_emas.append(downs[idx] * scaling + (1 - scaling) * down_emas[-1])
+
+        # reverse ema
+        up_emas = up_emas[-1::-1]
+        down_emas = down_emas[-1::-1]
+        rsi = []
+        for idx in range(len(data) - n):
+            rsi.append(100. - 100. / (1. + up_emas[idx] / down_emas[idx]))
+
+        for idx in range(n):
+            rsi.append(0.)
+
+        new_data['rsi%d' % n] = rsi
+        pre_rsi = rsi[1:]
+        pre_rsi.append(0.)
+        new_data['pre_rsi%d' % n] = pre_rsi
+
+    return new_data
+
 
 def add_features(data):
     new_data = add_preday_info(data)
     new_data = add_ma_info(new_data)
+    new_data = add_rsi_info(new_data)
 
     return new_data
 
 class Model:
     def __init__(self):
-        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200', 'pre_ema5', 'pre_ema10', 'pre_ema15', 'pre_ema20', 'pre_ema30', 'pre_ema50', 'pre_ema100', 'pre_ema200']
+        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200', 'pre_ema5', 'pre_ema10', 'pre_ema15', 'pre_ema20', 'pre_ema30', 'pre_ema50', 'pre_ema100', 'pre_ema200', 'pre_rsi2', 'pre_rsi3', 'pre_rsi4', 'pre_rsi5', 'pre_rsi6']
         self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
-        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200', 'ema5', 'ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200']
+        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200', 'ema5', 'ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200', 'rsi2', 'rsi3', 'rsi4', 'rsi5', 'rsi6']
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
