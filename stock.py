@@ -225,19 +225,60 @@ def add_rsi_info(data):
 
     return new_data
 
+def add_crossover_info(data):
+    # this project is for short-swing trading, so I just
+    # track 5-day period ema crossover with 10-day, 15-day, 20-day,
+    # 30-day, 50-day, 100-day, 200-day,
+    # -1 for breakdowns, 0 for normal, 1 for breakouts
+    new_data = data.reset_index(drop=True)
+    tracking_day = 'ema5'
+    cross_day = ['ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200']
+    cross_cols = ['cross5-10', 'cross5-15', 'cross5-20', 'cross5-30', 'cross5-50', 'cross5-100', 'cross5-200']
+    for ema, cross_col in zip(cross_day, cross_cols):
+        prestatus = 0
+        if new_data.iloc[-2][tracking_day] >= new_data.iloc[-2][ema]:
+            prestatus = 1
+        else:
+            prestatus = -1
+        crossover = []
+        crossover.append(prestatus)
+        for idx in range(len(new_data) - 2, -1, -1):
+            if prestatus == -1:
+                if new_data.iloc[idx][tracking_day] >= new_data.iloc[idx][ema]:
+                    crossover.append(1)
+                    prestatus = 1
+                else:
+                    crossover.append(0)
+            elif prestatus == 1:
+                if new_data.iloc[idx][tracking_day] >= new_data.iloc[idx][ema]:
+                    crossover.append(0)
+                else:
+                    crossover.append(-1)
+                    prestatus = -1
+
+        new_data[cross_col] = crossover[-1::-1]
+
+    precross_cols = ['pre_cross5-10', 'pre_cross5-15', 'pre_cross5-20', 'pre_cross5-30', 'pre_cross5-50', 'pre_cross5-100', 'pre_cross5-200']
+    for cross_col, precross_col in zip(cross_cols, precross_cols):
+        vals = new_data.iloc[1:][cross_col].tolist()
+        vals.append(0)
+        new_data[precross_col] = vals
+
+    return new_data
 
 def add_features(data):
     new_data = add_preday_info(data)
     new_data = add_ma_info(new_data)
     new_data = add_rsi_info(new_data)
+    new_data = add_crossover_info(new_data)
 
     return new_data
 
 class Model:
     def __init__(self):
-        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200', 'pre_ema5', 'pre_ema10', 'pre_ema15', 'pre_ema20', 'pre_ema30', 'pre_ema50', 'pre_ema100', 'pre_ema200', 'pre_rsi2', 'pre_rsi3', 'pre_rsi4', 'pre_rsi5', 'pre_rsi6']
+        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200', 'pre_ema5', 'pre_ema10', 'pre_ema15', 'pre_ema20', 'pre_ema30', 'pre_ema50', 'pre_ema100', 'pre_ema200', 'pre_rsi2', 'pre_rsi3', 'pre_rsi4', 'pre_rsi5', 'pre_rsi6', 'pre_cross5-10', 'pre_cross5-15', 'pre_cross5-20', 'pre_cross5-30', 'pre_cross5-50', 'pre_cross5-100', 'pre_cross5-200']
         self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
-        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200', 'ema5', 'ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200', 'rsi2', 'rsi3', 'rsi4', 'rsi5', 'rsi6']
+        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200', 'ema5', 'ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200', 'rsi2', 'rsi3', 'rsi4', 'rsi5', 'rsi6', 'cross5-10', 'cross5-15', 'cross5-20', 'cross5-30', 'cross5-50', 'cross5-100', 'cross5-200']
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
