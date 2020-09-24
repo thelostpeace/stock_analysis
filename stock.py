@@ -21,6 +21,7 @@ import tushare as ts
 import datetime
 import argparse
 import math
+import ta
 
 predict_days = 5
 
@@ -115,61 +116,22 @@ def add_ma_info(data):
     new_data = data.reset_index(drop=True)
     days = [5, 10, 15, 20, 30, 50, 100, 200]
     # add simple ma info
-    smas = [[] for i in range(len(days))]
-    count = 0
-    for day in days:
-        for idx in range(len(data) - day + 1):
-            smas[count].append(new_data.iloc[idx : idx + day].close.sum() / day)
-        count += 1
-
-    count = 0
-    for day in days:
-        for idx in range(day - 1):
-            smas[count].append(0.)
-        count += 1
-
-    for day, sma in zip(days, smas):
-        new_data['sma%d' % day] = sma
-
-    sma_cols = ["sma%d" % d for d in days]
-    pre_smas = [[] for i in range(len(sma_cols))]
-    count = 0
-    for col in sma_cols:
-        pre_smas[count] = new_data.iloc[1:][col].tolist()
-        pre_smas[count].append(0.)
-        count += 1
-
-    for col, pre_sma in zip(sma_cols, pre_smas):
-        new_data["pre_%s" % col] = pre_sma
+    cols = ["sma%d" % d for d in days]
+    for day, col in zip(days, cols):
+        new_data[col] = ta.utils.sma(new_data.iloc[-1::-1].close, periods=day)[-1::-1]
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
 
     # add exponential ma info
     # scaling = s / (1 + d), s is smoothing, typically 2, d is ma days
     # ema(t) = v * scaling + ema(t - 1) * (1 - scaling), v is time(t)'s price
-    emas = [[] for i in range(len(days))]
-    count = 0
-    for day in days:
-        scaling = 2. / (1 + day)
-        for idx in range(len(data) - 1, -1, -1):
-            if idx == len(data) - 1:
-                emas[count].append(new_data.iloc[idx].close)
-                continue
-            emas[count].append(new_data.iloc[idx].close * scaling + (1 - scaling) * emas[count][-1])
-        count += 1
-
-    for day, ema in zip(days, emas):
-        # reverse ema
-        new_data['ema%d' % day] = ema[-1::-1]
-
-    ema_cols = ['ema%d' % d for d in days]
-    pre_emas = [[] for i in range(len(days))]
-    count = 0
-    for col in ema_cols:
-        pre_emas[count] = new_data.iloc[1:][col].tolist()
-        pre_emas[count].append(0.)
-        count += 1
-
-    for col, pre_ema in zip(ema_cols, pre_emas):
-        new_data["pre_%s" % col] = pre_ema
+    cols = ["ema%d" % d for d in days]
+    for day, col in zip(days, cols):
+        new_data[col] = ta.utils.ema(new_data.iloc[-1::-1].close, periods=day)[-1::-1]
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
 
     return new_data
 
@@ -182,46 +144,13 @@ def add_rsi_info(data):
         average downn = sum(down moves) / N
     '''
     # calculate ups and downs
-    ups = []
-    downs = []
-    for idx in range(len(data) - 1):
-        if new_data.iloc[idx].close > new_data.iloc[idx + 1].close:
-            ups.append(new_data.iloc[idx].close - new_data.iloc[idx + 1].close)
-            downs.append(0.)
-        else:
-            ups.append(0.)
-            downs.append(new_data.iloc[idx + 1].close - new_data.iloc[idx].close)
-    ups.append(0.)
-    downs.append(0.)
-    # period of RSI
     N = [2,3,4,5,6]
-    for n in N:
-        # calculate ema
-        up_emas = []
-        down_emas = []
-        scaling = 2. / (1 + n)
-        for idx in range(len(ups) - 1, -1, -1):
-            if idx == len(data) - 1:
-                up_emas.append(ups[-1])
-                down_emas.append(downs[-1])
-                continue
-            up_emas.append(ups[idx] * scaling + (1 - scaling) * up_emas[-1])
-            down_emas.append(downs[idx] * scaling + (1 - scaling) * down_emas[-1])
-
-        # reverse ema
-        up_emas = up_emas[-1::-1]
-        down_emas = down_emas[-1::-1]
-        rsi = []
-        for idx in range(len(data) - n):
-            rsi.append(100. - 100. / (1. + up_emas[idx] / down_emas[idx]))
-
-        for idx in range(n):
-            rsi.append(0.)
-
-        new_data['rsi%d' % n] = rsi
-        pre_rsi = rsi[1:]
-        pre_rsi.append(0.)
-        new_data['pre_rsi%d' % n] = pre_rsi
+    cols = ["rsi%d" % n for n in N]
+    for n, col in zip(N, cols):
+        new_data[col] = ta.momentum.rsi(new_data.iloc[-1::-1].close, n=n)[-1::-1]
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
 
     return new_data
 
@@ -266,19 +195,60 @@ def add_crossover_info(data):
 
     return new_data
 
+def add_long_crossover_info(data):
+    # add 50-day 100-day crossover info, I think
+    # it is not important for short-swing trading,
+    # but sometimes it happens, just add this feature
+    new_data = data.reset_index(drop=True)
+    tracking_day = 'ema50'
+    cross_day = ['ema100']
+    cross_cols = ['longcross']
+    for ema, cross_col in zip(cross_day, cross_cols):
+        prestatus = 0
+        if new_data.iloc[-2][tracking_day] >= new_data.iloc[-2][ema]:
+            prestatus = 1
+        else:
+            prestatus = -1
+        crossover = []
+        crossover.append(prestatus)
+        for idx in range(len(new_data) - 2, -1, -1):
+            if prestatus == -1:
+                if new_data.iloc[idx][tracking_day] >= new_data.iloc[idx][ema]:
+                    crossover.append(1)
+                    prestatus = 1
+                else:
+                    crossover.append(0)
+            elif prestatus == 1:
+                if new_data.iloc[idx][tracking_day] >= new_data.iloc[idx][ema]:
+                    crossover.append(0)
+                else:
+                    crossover.append(-1)
+                    prestatus = -1
+
+        new_data[cross_col] = crossover[-1::-1]
+
+    precross_cols = ['pre_longcross']
+    for cross_col, precross_col in zip(cross_cols, precross_cols):
+        vals = new_data.iloc[1:][cross_col].tolist()
+        vals.append(0)
+        new_data[precross_col] = vals
+
+    return new_data
+
 def add_features(data):
     new_data = add_preday_info(data)
     new_data = add_ma_info(new_data)
     new_data = add_rsi_info(new_data)
     new_data = add_crossover_info(new_data)
+    new_data = add_long_crossover_info(new_data)
 
     return new_data
 
 class Model:
-    def __init__(self):
-        self.features = ['pre_open', 'pre_high', 'pre_low', 'pre_close', 'pre_change', 'pre_pct_chg', 'pre_vol', 'pre_amount', 'pre_sma5', 'pre_sma10', 'pre_sma15', 'pre_sma20', 'pre_sma30', 'pre_sma50', 'pre_sma100', 'pre_sma200', 'pre_ema5', 'pre_ema10', 'pre_ema15', 'pre_ema20', 'pre_ema30', 'pre_ema50', 'pre_ema100', 'pre_ema200', 'pre_rsi2', 'pre_rsi3', 'pre_rsi4', 'pre_rsi5', 'pre_rsi6', 'pre_cross5-10', 'pre_cross5-15', 'pre_cross5-20', 'pre_cross5-30', 'pre_cross5-50', 'pre_cross5-100', 'pre_cross5-200']
+    def __init__(self, columns):
+        self.features = [x for x in columns if 'pre_' in x]
         self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
-        self.predict_features = ['open', 'high', 'low', 'close', 'change', 'pct_chg', 'vol', 'amount', 'sma5', 'sma10', 'sma15', 'sma20', 'sma30', 'sma50', 'sma100', 'sma200', 'ema5', 'ema10', 'ema15', 'ema20', 'ema30', 'ema50', 'ema100', 'ema200', 'rsi2', 'rsi3', 'rsi4', 'rsi5', 'rsi6', 'cross5-10', 'cross5-15', 'cross5-20', 'cross5-30', 'cross5-50', 'cross5-100', 'cross5-200']
+        self.predict_features = [x.replace('pre_', '') for x in self.features]
 
         self.params = {
             'n_estimators': range(100, 1000, 100),
@@ -352,7 +322,7 @@ if __name__ == "__main__":
     print("data length: %d" % len(data))
     data = add_features(data)
 
-    model = Model()
+    model = Model(data.columns.tolist())
     model.train(data.iloc[predict_days - 1:-200])
     #print(model.predict(data))
     model.plot(data, 30, args.stock)
