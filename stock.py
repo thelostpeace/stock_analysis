@@ -6,6 +6,7 @@ import glob
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from xgboost import XGBClassifier
 from xgboost import XGBRegressor
 from sklearn.model_selection import RandomizedSearchCV
@@ -235,14 +236,115 @@ def add_long_crossover_info(data):
 
     return new_data
 
+def add_bollinger_band_info(data):
+    new_data = data.reset_index(drop=True)
+    #N = [20, 14, 12, 10, 5, 4, 3, 2]
+    N = [20]
+    for n in N:
+        bb = ta.volatility.BollingerBands(close=new_data.iloc[-1::-1].close, n=n, ndev=2)
+        col = 'boll_hband%d' % n
+        new_data[col] = bb.bollinger_hband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+        col = 'boll_lband%d' % n
+        new_data[col] = bb.bollinger_lband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+        col = 'boll_hband_ind%d' % n
+        new_data[col] = bb.bollinger_hband_indicator()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+        col = 'boll_lband_ind%d' % n
+        new_data[col] = bb.bollinger_lband_indicator()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+        col = 'boll_mavg%d' % n
+        new_data[col] = bb.bollinger_mavg()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+        col = 'boll_pband%d' % n
+        new_data[col] = bb.bollinger_pband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+        col = 'boll_wband%d' % n
+        new_data[col] = bb.bollinger_wband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data['pre_%s' % col] = temp
+
+    return new_data
+
+def add_obv_info(data):
+    new_data = data.reset_index(drop=True)
+    obv = ta.volume.OnBalanceVolumeIndicator(close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol)
+    new_data['obv'] = obv.on_balance_volume()
+    temp = new_data.iloc[1:]['obv'].tolist()
+    temp.append(np.nan)
+    new_data['pre_obv'] = temp
+
+    return new_data
+
+def add_adi_info(data):
+    new_data = data.reset_index(drop=True)
+    adi = ta.volume.AccDistIndexIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol)
+    new_data['adi'] = adi.acc_dist_index()
+    temp = new_data.iloc[1:]['adi'].tolist()
+    temp.append(np.nan)
+    new_data['pre_adi'] = temp
+
+    return new_data
+
+def add_cmf_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        cmf = ta.volume.ChaikinMoneyFlowIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol, n=day)
+        col = "cmf%d" % day
+        new_data[col] = cmf.chaikin_money_flow()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
 def add_features(data):
     new_data = add_preday_info(data)
     new_data = add_ma_info(new_data)
     new_data = add_rsi_info(new_data)
     new_data = add_crossover_info(new_data)
     new_data = add_long_crossover_info(new_data)
+    new_data = add_bollinger_band_info(new_data)
+    new_data = add_obv_info(new_data)
+    new_data = add_adi_info(new_data)
+    new_data = add_cmf_info(new_data)
 
     return new_data
+
+def plot_data(data, days, close, cols):
+    x = range(days)
+    count = 0
+    fig, ax = plt.subplots(len(cols))
+    for col in cols:
+        vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
+        vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
+        sns.lineplot(x=x, y=StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten(), ax=ax[count])
+        sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
+        ax[count].legend([col, close])
+        count += 1
+    plt.savefig('pattern.png')
+
 
 class Model:
     def __init__(self, columns):
@@ -321,9 +423,10 @@ if __name__ == "__main__":
     data = data.dropna(axis=0)
     print("data length: %d" % len(data))
     data = add_features(data)
+    plot_data(data, 100, 'close', ['adi', 'obv', 'rsi2', 'boll_wband20', 'cmf15'])
 
-    model = Model(data.columns.tolist())
-    model.train(data.iloc[predict_days - 1:-200])
-    #print(model.predict(data))
-    model.plot(data, 30, args.stock)
-    model.feature_importance()
+    #model = Model(data.columns.tolist())
+    #model.train(data.iloc[predict_days - 1:-200])
+    ##print(model.predict(data))
+    #model.plot(data, 30, args.stock)
+    #model.feature_importance()
