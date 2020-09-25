@@ -335,13 +335,19 @@ def add_features(data):
 def plot_data(data, days, close, cols):
     x = range(days)
     count = 0
+    plt.figure()
     fig, ax = plt.subplots(len(cols))
     for col in cols:
         vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
         vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
         sns.lineplot(x=x, y=StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten(), ax=ax[count])
         sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
-        ax[count].legend([col, close])
+        if 'cmf' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, 'adi'])
+        else:
+            ax[count].legend([col, close])
         count += 1
     plt.savefig('pattern.png')
 
@@ -394,6 +400,7 @@ class Model:
             y.append(y[-1] * (1 + chg / 100))
             print("predict: %s" % y[-1])
 
+        plt.figure()
         sns.lineplot(x=x, y=y)
         sns.lineplot(x=x[:days], y=y[:days])
         plt.savefig('%s.png' % stock)
@@ -425,8 +432,8 @@ if __name__ == "__main__":
     data = add_features(data)
     plot_data(data, 100, 'close', ['adi', 'obv', 'rsi2', 'boll_wband20', 'cmf15'])
 
-    #model = Model(data.columns.tolist())
-    #model.train(data.iloc[predict_days - 1:-200])
-    ##print(model.predict(data))
-    #model.plot(data, 30, args.stock)
-    #model.feature_importance()
+    model = Model(data.columns.tolist())
+    model.train(data.iloc[predict_days - 1:-200])
+    #print(model.predict(data))
+    model.plot(data, 30, args.stock)
+    model.feature_importance()
