@@ -386,6 +386,69 @@ def add_vwap_info(data):
 
     return new_data
 
+def add_atr_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        atr = ta.volatility.AverageTrueRange(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "atr%d" % day
+        new_data[col] = atr.average_true_range()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_kc_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        kc = ta.volatility.KeltnerChannel(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "kc_mband%d" % day
+        new_data[col] = kc.keltner_channel_mband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "kc_pband%d" % day
+        new_data[col] = kc.keltner_channel_pband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "kc_wband%d" % day
+        new_data[col] = kc.keltner_channel_wband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_dc_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        dc = ta.volatility.DonchianChannel(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "dc_mband%d" % day
+        new_data[col] = dc.donchian_channel_mband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "dc_pband%d" % day
+        new_data[col] = dc.donchian_channel_pband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "dc_wband%d" % day
+        new_data[col] = dc.donchian_channel_wband()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
 def add_features(data):
     # previous day info
     new_data = add_preday_info(data)
@@ -415,6 +478,12 @@ def add_features(data):
     new_data = add_nvi_info(new_data)
     # volume weighted average price
     new_data = add_vwap_info(new_data)
+    # average true range
+    new_data = add_atr_info(new_data)
+    # keltner channel
+    new_data = add_kc_info(new_data)
+    # donchian channel
+    new_data = add_dc_info(new_data)
 
     return new_data
 
@@ -422,7 +491,7 @@ def plot_data(data, days, close, cols):
     x = range(days)
     count = 0
     plt.figure()
-    fig, ax = plt.subplots(len(cols), figsize=[6.4 * 3, 4.8 * 3])
+    fig, ax = plt.subplots(len(cols), figsize=[6.4 * 3, 4.8 * len(cols)])
     for col in cols:
         vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
         vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
@@ -498,7 +567,7 @@ class Model:
             feature_map = list(zip(self.predict_features, model.best_estimator_.feature_importances_))
             fi = sorted(feature_map, key=lambda v : v[1], reverse=True)
             fi = [v[0] for v in fi]
-            print("day%d percent change feature importance: %s" % (count, ' => '.join(fi)))
+            print("day%d percent change feature importance: %s\n" % (count, ' => '.join(fi)))
             count += 1
 
 
@@ -516,7 +585,8 @@ if __name__ == "__main__":
     data = data.dropna(axis=0)
     print("data length: %d" % len(data))
     data = add_features(data)
-    plot_data(data, 100, 'close', ['adi', 'obv', 'rsi2', 'boll_wband20', 'cmf15', 'fi20', 'eom15', 'vpt', 'nvi', 'vwap30'])
+    print("columns: %s", data.columns.tolist())
+    plot_data(data, 100, 'close', ['obv', 'rsi2', 'boll_wband20', 'vwap30', 'atr5', 'kc_wband15'])
 
     model = Model(data.columns.tolist())
     model.train(data.iloc[predict_days - 1:-200])
