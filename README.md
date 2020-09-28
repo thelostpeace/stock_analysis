@@ -24,3 +24,5 @@ day3 percent change feature importance: sma100 => sma10 => sma50 => ema5 => sma1
 day4 percent change feature importance: ema50 => sma10 => sma30 => amount => pct_chg => ema15 => sma50 => sma15 => cross5-15 => ema30 => sma200 => sma100 => rsi6 => rsi2 => high => ema200 => cross5-10 => sma20 => ema100 => sma5 => ema5 => rsi5 => rsi3 => open => rsi4 => ema10 => low => close => ema20 => vol => cross5-30 => change => cross5-100 => cross5-50 => cross5-20 => cross5-200
 day5 percent change feature importance: sma50 => ema15 => ema10 => sma15 => ema20 => pct_chg => amount => sma20 => change => sma200 => ema5 => ema50 => low => sma10 => ema200 => cross5-30 => cross5-15 => open => sma100 => rsi2 => ema30 => sma30 => ema100 => vol => rsi5 => rsi3 => rsi6 => sma5 => close => cross5-10 => rsi4 => cross5-200 => high => cross5-20 => cross5-50 => cross5-100
 ```
+
+ - 2020-09-28 update: add a lot of indicators, but **vwap30** is the only useful indicator for trading. it seems that when price crosses vwap30 and is greater than vwap30, it is time to buy.

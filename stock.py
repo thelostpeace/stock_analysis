@@ -319,16 +319,102 @@ def add_cmf_info(data):
 
     return new_data
 
+def add_fi_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        fi = ta.volume.ForceIndexIndicator(close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol, n=day)
+        col = "fi%d" % day
+        new_data[col] = fi.force_index()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_eom_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        eom = ta.volume.EaseOfMovementIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, volume=new_data.iloc[-1::-1].vol, n=day)
+        col = "eom%d" % day
+        new_data[col] = eom.ease_of_movement()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "sma_eom%d" % day
+        new_data[col] = eom.sma_ease_of_movement()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_vpt_info(data):
+    new_data = data.reset_index(drop=True)
+    vpt = ta.volume.VolumePriceTrendIndicator(close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol)
+    col = "vpt"
+    new_data[col] = vpt.volume_price_trend()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_nvi_info(data):
+    new_data = data.reset_index(drop=True)
+    nvi = ta.volume.NegativeVolumeIndexIndicator(close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol)
+    col = "nvi"
+    new_data[col] = nvi.negative_volume_index()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_vwap_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        vwap = ta.volume.VolumeWeightedAveragePrice(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, volume=new_data.iloc[-1::-1].vol, close=new_data.iloc[-1::-1].close, n=day)
+        col = "vwap%d" % day
+        new_data[col] = vwap.volume_weighted_average_price()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
 def add_features(data):
+    # previous day info
     new_data = add_preday_info(data)
+    # moving average info
     new_data = add_ma_info(new_data)
+    # rsi info
     new_data = add_rsi_info(new_data)
+    # crossover of moving average
     new_data = add_crossover_info(new_data)
+    # long crossover of moving average
     new_data = add_long_crossover_info(new_data)
+    # bollinger bands
     new_data = add_bollinger_band_info(new_data)
+    # on-balance volume
     new_data = add_obv_info(new_data)
+    # accumulation/distribution index
     new_data = add_adi_info(new_data)
+    # chaikin money flow
     new_data = add_cmf_info(new_data)
+    # force index
+    new_data = add_fi_info(new_data)
+    # ease of movement
+    new_data = add_eom_info(new_data)
+    # volume price trend
+    new_data = add_vpt_info(new_data)
+    # negative volume index
+    new_data = add_nvi_info(new_data)
+    # volume weighted average price
+    new_data = add_vwap_info(new_data)
 
     return new_data
 
@@ -336,7 +422,7 @@ def plot_data(data, days, close, cols):
     x = range(days)
     count = 0
     plt.figure()
-    fig, ax = plt.subplots(len(cols))
+    fig, ax = plt.subplots(len(cols), figsize=[6.4 * 3, 4.8 * 3])
     for col in cols:
         vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
         vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
@@ -430,7 +516,7 @@ if __name__ == "__main__":
     data = data.dropna(axis=0)
     print("data length: %d" % len(data))
     data = add_features(data)
-    plot_data(data, 100, 'close', ['adi', 'obv', 'rsi2', 'boll_wband20', 'cmf15'])
+    plot_data(data, 100, 'close', ['adi', 'obv', 'rsi2', 'boll_wband20', 'cmf15', 'fi20', 'eom15', 'vpt', 'nvi', 'vwap30'])
 
     model = Model(data.columns.tolist())
     model.train(data.iloc[predict_days - 1:-200])
