@@ -449,6 +449,280 @@ def add_dc_info(data):
 
     return new_data
 
+def add_macd_info(data):
+    new_data = data.reset_index(drop=True)
+    macd = ta.trend.MACD(close=new_data.iloc[-1::-1].close, n_slow=15, n_fast=5, n_sign=7)
+    col = "macd"
+    new_data[col] = macd.macd()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "macd_diff"
+    new_data[col] = macd.macd_diff()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "macd_signal"
+    new_data[col] = macd.macd_signal()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+    return new_data
+
+def add_adx_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        adx = ta.trend.ADXIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "adx%d" % day
+        new_data[col] = adx.adx()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "adx_neg%d" % day
+        new_data[col] = adx.adx_neg()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "adx_pos%d" % day
+        new_data[col] = adx.adx_pos()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_vi_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        vi = ta.trend.VortexIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "vi_diff%d" % day
+        new_data[col] = vi.vortex_indicator_diff()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "vi_neg%d" % day
+        new_data[col] = vi.vortex_indicator_neg()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "vi_pos%d" % day
+        new_data[col] = vi.vortex_indicator_pos()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_trix_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        trix = ta.trend.TRIXIndicator(close=new_data.iloc[-1::-1].close, n=day)
+        col = "trix%d" % day
+        new_data[col] = trix.trix()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_mi_info(data):
+    new_data = data.reset_index(drop=True)
+    mi = ta.trend.MassIndex(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low)
+    col = "mi"
+    new_data[col] = mi.mass_index()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_cci_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        cci = ta.trend.CCIIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "cci%d" % day
+        new_data[col] = cci.cci()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_dpo_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        dpo = ta.trend.DPOIndicator(close=new_data.iloc[-1::-1].close, n=day)
+        col = "dpo%d" % day
+        new_data[col] = dpo.dpo()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_kst_info(data):
+    new_data = data.reset_index(drop=True)
+    kst = ta.trend.KSTIndicator(close=new_data.iloc[-1::-1].close)
+    col = "kst"
+    new_data[col] = kst.kst()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "kst_diff"
+    new_data[col] = kst.kst_diff()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "kst_sig"
+    new_data[col] = kst.kst_sig()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_ichimoku_info(data):
+    new_data = data.reset_index(drop=True)
+    ichimoku = ta.trend.IchimokuIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low)
+    col = "ichimoku_a"
+    new_data[col] = ichimoku.ichimoku_a()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "ichimoku_b"
+    new_data[col] = ichimoku.ichimoku_b()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "ichimoku_base"
+    new_data[col] = ichimoku.ichimoku_base_line()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "ichimoku_conv"
+    new_data[col] = ichimoku.ichimoku_conversion_line()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_psar_info(data):
+    new_data = data.reset_index(drop=True)
+    psar = ta.trend.PSARIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close)
+    col = "psar"
+    new_data[col] = psar.psar()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "psar_down"
+    new_data[col] = psar.psar_down()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "psar_down_idc"
+    new_data[col] = psar.psar_down_indicator()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "psar_up"
+    new_data[col] = psar.psar_up()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    col = "psar_up_idc"
+    new_data[col] = psar.psar_up_indicator()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_tsi_info(data):
+    new_data = data.reset_index(drop=True)
+    tsi = ta.momentum.TSIIndicator(close=new_data.iloc[-1::-1].close)
+    col = "tsi"
+    new_data[col] = tsi.tsi()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_uo_info(data):
+    new_data = data.reset_index(drop=True)
+    uo = ta.momentum.UltimateOscillator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close)
+    col = "uo"
+    new_data[col] = uo.uo()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_so_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        so = ta.momentum.StochasticOscillator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
+        col = "stoch%d" % day
+        new_data[col] = so.stoch()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+        col = "stoch_signal%d" % day
+        new_data[col] = so.stoch_signal()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_wr_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        wr = ta.momentum.WilliamsRIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, lbp=day)
+        col = "wr%d" % day
+        new_data[col] = wr.wr()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_ao_info(data):
+    new_data = data.reset_index(drop=True)
+    ao = ta.momentum.AwesomeOscillatorIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low)
+    col = "ao"
+    new_data[col] = ao.ao()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
 def add_features(data):
     # previous day info
     new_data = add_preday_info(data)
@@ -484,6 +758,36 @@ def add_features(data):
     new_data = add_kc_info(new_data)
     # donchian channel
     new_data = add_dc_info(new_data)
+    # moving average convergence divergence
+    new_data = add_macd_info(new_data)
+    # average directional movement index
+    new_data = add_adx_info(new_data)
+    # vortex indicator
+    new_data = add_vi_info(new_data)
+    # trix indicator
+    new_data = add_trix_info(new_data)
+    # mass index
+    new_data = add_mi_info(new_data)
+    # commodity channel index
+    new_data = add_cci_info(new_data)
+    # detrended price oscillator
+    new_data = add_dpo_info(new_data)
+    # kst oscillator
+    new_data = add_kst_info(new_data)
+    # ichimoku kinko hyo
+    new_data = add_ichimoku_info(new_data)
+    # parabolic stop and reverse
+    new_data = add_psar_info(new_data)
+    # true strength index
+    new_data = add_tsi_info(new_data)
+    # ultimate oscillator
+    new_data = add_uo_info(new_data)
+    # stochastic oscillator
+    new_data = add_so_info(new_data)
+    # williams %R
+    new_data = add_wr_info(new_data)
+    # awesome oscillator
+    new_data = add_ao_info(new_data)
 
     return new_data
 
@@ -491,7 +795,7 @@ def plot_data(data, days, close, cols):
     x = range(days)
     count = 0
     plt.figure()
-    fig, ax = plt.subplots(len(cols), figsize=[6.4 * 3, 4.8 * len(cols)])
+    fig, ax = plt.subplots(len(cols), figsize=[6.4 * 3, 4 * len(cols)])
     for col in cols:
         vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
         vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
@@ -501,6 +805,35 @@ def plot_data(data, days, close, cols):
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             ax[count].legend([col, close, 'adi'])
+        elif 'macd' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['macd_signal'].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, 'macd_signal'])
+        elif 'adx' in col:
+            day = col.replace('adx', '')
+            vals = data.iloc[0:days].iloc[-1::-1]['adx_pos%s' % day].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['adx_neg%s' % day].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, '+DMI', '-DMI'])
+        elif 'vi_diff' in col:
+            day = col.replace('vi_diff', '')
+            vals = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['vi_neg%s' % day].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, '+VI', '-VI'])
+        elif 'kst' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['kst_diff'].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['kst_sig'].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, 'kst_diff', 'kst_sig'])
+        elif 'stoch' in col:
+            day = col.replace('stoch', '')
+            vals = data.iloc[0:days].iloc[-1::-1]['stoch_signal%s' % day].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, 'stoch_signal'])
         else:
             ax[count].legend([col, close])
         count += 1
@@ -586,7 +919,7 @@ if __name__ == "__main__":
     print("data length: %d" % len(data))
     data = add_features(data)
     print("columns: %s", data.columns.tolist())
-    plot_data(data, 100, 'close', ['obv', 'rsi2', 'boll_wband20', 'vwap30', 'atr5', 'kc_wband15'])
+    plot_data(data, 100, 'close', ['obv', 'rsi2', 'boll_wband20', 'vwap30', 'atr5', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'uo', 'stoch15', 'wr15'])
 
     model = Model(data.columns.tolist())
     model.train(data.iloc[predict_days - 1:-200])
