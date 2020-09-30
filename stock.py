@@ -723,6 +723,63 @@ def add_ao_info(data):
 
     return new_data
 
+def add_kama_info(data):
+    new_data = data.reset_index(drop=True)
+    kama = ta.momentum.KAMAIndicator(close=new_data.iloc[-1::-1].close)
+    col = "kama"
+    new_data[col] = kama.kama()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_roc_info(data):
+    new_data = data.reset_index(drop=True)
+    days = [2,5,10,15,20,30]
+    for day in days:
+        roc = ta.momentum.ROCIndicator(close=new_data.iloc[-1::-1].close, n=day)
+        col = "roc%d" % day
+        new_data[col] = roc.roc()
+        temp = new_data.iloc[1:][col].tolist()
+        temp.append(np.nan)
+        new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_dr_info(data):
+    new_data = data.reset_index(drop=True)
+    dr = ta.others.DailyReturnIndicator(close=new_data.iloc[-1::-1].close)
+    col = "dr"
+    new_data[col] = dr.daily_return()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_dlr_info(data):
+    new_data = data.reset_index(drop=True)
+    dlr = ta.others.DailyLogReturnIndicator(close=new_data.iloc[-1::-1].close)
+    col = "dlr"
+    new_data[col] = dlr.daily_log_return()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
+def add_cr_info(data):
+    new_data = data.reset_index(drop=True)
+    cr = ta.others.CumulativeReturnIndicator(close=new_data.iloc[-1::-1].close)
+    col = "cr"
+    new_data[col] = cr.cumulative_return()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
 def add_features(data):
     # previous day info
     new_data = add_preday_info(data)
@@ -788,6 +845,16 @@ def add_features(data):
     new_data = add_wr_info(new_data)
     # awesome oscillator
     new_data = add_ao_info(new_data)
+    # kaufman's adaptive moving average
+    new_data = add_kama_info(new_data)
+    # rate of change
+    new_data = add_roc_info(new_data)
+    # daily return
+    new_data = add_dr_info(new_data)
+    # daily log return
+    new_data = add_dlr_info(new_data)
+    # cumulative return
+    new_data = add_cr_info(new_data)
 
     return new_data
 
@@ -919,7 +986,7 @@ if __name__ == "__main__":
     print("data length: %d" % len(data))
     data = add_features(data)
     print("columns: %s", data.columns.tolist())
-    plot_data(data, 100, 'close', ['obv', 'rsi2', 'boll_wband20', 'vwap30', 'atr5', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'uo', 'stoch15', 'wr15'])
+    plot_data(data, 100, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'])
 
     model = Model(data.columns.tolist())
     model.train(data.iloc[predict_days - 1:-200])
