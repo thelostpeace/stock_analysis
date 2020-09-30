@@ -10,9 +10,53 @@ import argparse
 import math
 import ta
 import os, sys
+import smtplib
+import imghdr
+from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from email.mime.text import MIMEText
 
 predict_days = 5
-api = ts.pro_api(token='dfbd7c823ef805be150ef0f805a855714187e227e8e715dc8cb0ba48')
+api = ts.pro_api(token='your tushare token')
+
+trading_note = """
+本邮件由程序自动发送，勿回复，谢谢！
+
+### 结论
+
+经过这段时间的测试，选出以下指标，其中close为收盘价
+
+ - rsi2: 即两日RSI，2周期RSI是一个比较敏感的指标，对短期阶段性的买点判断比较准确，但是对买点判断不准确，只依靠2周期RSI容易卖飞，遇到差行情很容易回撤
+
+ - boll_wband20: 20周期的bollinger bands，对于短期趋势的判定很准确，当价格线上穿boll_wband20并且与boll_wband20同趋势的时候，是很强的上升势
+
+ - vwap30: 30周期的volume weighted average price，当价格线上穿vwap30并且与vwap30同趋势的时候，是很强的上升势
+
+ - kc_wband15: 15周期的keltner channel，当价格线上穿kc_wband15并且与kc_wband15同趋势的时候，是很强的上升势
+
+ - macd: 快线5周期，慢线15周期，信号线7周期，当macd线上穿信号线的时候是上升趋势，但是有一定的延时性
+
+ - adx15: 15周期average directional movement index, 当+DMI > -DMI的时候是上升势
+
+ - trix2: 2周期trix，当trix2上穿价格线并且与价格线同趋势的时候，是很强的上升势
+
+ - mi: mass index，当价格线上穿mi并且与mi同趋势的时候，是很强的上升势
+
+ - cci5: 5周期的commodity channel index，非常敏感，当cci5 > close并且没有很明显的下降趋势的时候，是上升势
+
+ - kst: kst oscillator, 当kst上穿信号线并且同趋势的时候，是很强的上升势，有误判情况
+
+ - psar: parabolic stop and reverse，每次价格线上穿psar都是买点
+
+ - tsi: true strength index，tsi上穿价格线是很强的上升势
+
+ - wr15: 15周期williams percent range，当wr15上穿价格线并持续保持在价格线之上，是上升势
+
+ - roc15: 15周期rate of change，当roc15上穿价格线并保持在价格线之上，是上升势
+
+ - kama: kaufman's adaptive moving average, 当价格线上穿kama，是上升势
+"""
 
 def check_stock_data(name):
     files = glob.glob(name)
@@ -899,6 +943,35 @@ def clear_directory(dirname):
     for fname in files:
         os.remove(fname)
 
+def send_mail():
+    msg_from = "your qq mail"
+    passwd = "qq mail authority code"
+    msg_to = "to mail"
+
+    today = datetime.datetime.today().strftime("%Y-%m-%d")
+    msg = MIMEMultipart()
+    msg['Subject'] = "%s stock trading plottings" % today
+    msg['From'] = msg_from
+    msg['To'] = msg_to
+
+    msg.attach(MIMEText(trading_note))
+
+    plottings = glob.glob('pattern/*')
+    for fname in plottings:
+        with open(fname, 'rb') as fp:
+            img_data = fp.read()
+            msg.attach(MIMEApplication(img_data, Name=os.path.basename(fname)))
+
+    try:
+        s = smtplib.SMTP('smtp.qq.com', 587)
+        s.login(msg_from, passwd)
+        s.sendmail(msg_from, msg_to, msg.as_string())
+        print("sending mail success!")
+    except s.SMTPException as e:
+        print("sending failed:", e)
+    finally:
+        s.quit()
+
 if __name__ == "__main__":
     clear_directory("pattern")
     candidates = get_stock_candidates()
@@ -915,3 +988,5 @@ if __name__ == "__main__":
         print("plotting picture for %s" % cand)
         plot_data(data, 100, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
         print("="*20, "DONE", "="*20)
+
+    send_mail()
