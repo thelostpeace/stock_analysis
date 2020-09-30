@@ -29,3 +29,5 @@
  - wr15: 15周期williams percent range，当wr15上穿价格线并持续保持在价格线之上，是上升势
 
  - roc15: 15周期rate of change，当roc15上穿价格线并保持在价格线之上，是上升势
+
+ - kama: kaufman's adaptive moving average, 当价格线上穿kama，是上升势

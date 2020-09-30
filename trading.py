@@ -1,30 +1,18 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.base import TransformerMixin
 import glob
 import seaborn as sns
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
-from xgboost import XGBClassifier
-from xgboost import XGBRegressor
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
-from sklearn.utils.multiclass import type_of_target
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import SelectFromModel
-from sklearn.svm import LinearSVC
 import tushare as ts
 import datetime
 import argparse
 import math
 import ta
+import os, sys
 
 predict_days = 5
+api = ts.pro_api(token='dfbd7c823ef805be150ef0f805a855714187e227e8e715dc8cb0ba48')
 
 def check_stock_data(name):
     files = glob.glob(name)
@@ -32,33 +20,31 @@ def check_stock_data(name):
     return (len(files) != 0)
 
 def get_stock_data(name, store_file):
-    api = ts.pro_api(token='9a29d45bfd6a127f24365620f9bb730f557abaacff59656b0218b843')
     today = datetime.date.today()
-    if check_stock_data(store_file):
-        data = pd.read_csv(store_file)
-        saved_date = datetime.datetime.strptime(str(data.iloc[0].trade_date), '%Y%m%d')
+    data = pd.DataFrame()
+    end_date = today.strftime("%Y%m%d")
+    while True:
+        tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
+        print("get data length: %d, end_date: %s" % (len(tmp), end_date))
+        end_date = datetime.datetime.strptime(str(tmp.iloc[-1].trade_date), '%Y%m%d')
         delta = datetime.timedelta(days=1)
-        start_date = saved_date + delta
-        extend_data = ts.pro_bar(ts_code=name, api=api, start_date=start_date.strftime("%Y%m%d"), end_date=today.strftime("%Y%m%d"), adj='qfq')
-        if extend_data:
-            print("extend data length: %d" % len(extend_data))
-            data = extend_data.append(data)
-    else:
-        data = pd.DataFrame()
-        end_date = today.strftime("%Y%m%d")
-        while True:
-            tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
-            print("get data length: %d, end_date: %s" % (len(tmp), end_date))
-            end_date = datetime.datetime.strptime(str(tmp.iloc[-1].trade_date), '%Y%m%d')
-            delta = datetime.timedelta(days=1)
-            end_date = (end_date - delta).strftime("%Y%m%d")
-            data = data.append(tmp)
-            if len(tmp) < 5000:
-                break
-
-    data.to_csv(store_file, index=False)
+        end_date = (end_date - delta).strftime("%Y%m%d")
+        data = data.append(tmp)
+        if len(tmp) < 5000:
+            break
 
     return data
+
+def get_stock_candidates():
+    today = datetime.date.today().strftime("%Y%m%d")
+    df = api.trade_cal(end_date=today)
+    last_trading_day = df[df.is_open == 1].iloc[-1]['cal_date']
+    df = api.daily_basic(trade_date=last_trading_day)
+    # 选取量比在1.8以上，换手率3以上，价格小于50的股票
+    candidates = df[(df.close < 50) & (df.volume_ratio > 1.8) & (df.turnover_rate_f > 3)]['ts_code'].tolist()
+
+    return candidates
+
 
 def add_preday_info(data):
     new_data = data.reset_index(drop=True)
@@ -782,46 +768,47 @@ def add_cr_info(data):
     return new_data
 
 def add_features(data):
+    new_data = data.reset_index(drop=True)
     # previous day info
-    new_data = add_preday_info(data)
+    #new_data = add_preday_info(new_data)
     # moving average info
-    new_data = add_ma_info(new_data)
+    #new_data = add_ma_info(new_data)
     # rsi info
     new_data = add_rsi_info(new_data)
     # crossover of moving average
-    new_data = add_crossover_info(new_data)
+    #new_data = add_crossover_info(new_data)
     # long crossover of moving average
-    new_data = add_long_crossover_info(new_data)
+    #new_data = add_long_crossover_info(new_data)
     # bollinger bands
     new_data = add_bollinger_band_info(new_data)
     # on-balance volume
-    new_data = add_obv_info(new_data)
+    #new_data = add_obv_info(new_data)
     # accumulation/distribution index
-    new_data = add_adi_info(new_data)
+    #new_data = add_adi_info(new_data)
     # chaikin money flow
-    new_data = add_cmf_info(new_data)
+    #new_data = add_cmf_info(new_data)
     # force index
-    new_data = add_fi_info(new_data)
+    #new_data = add_fi_info(new_data)
     # ease of movement
-    new_data = add_eom_info(new_data)
+    #new_data = add_eom_info(new_data)
     # volume price trend
-    new_data = add_vpt_info(new_data)
+    #new_data = add_vpt_info(new_data)
     # negative volume index
-    new_data = add_nvi_info(new_data)
+    #new_data = add_nvi_info(new_data)
     # volume weighted average price
     new_data = add_vwap_info(new_data)
     # average true range
-    new_data = add_atr_info(new_data)
+    #new_data = add_atr_info(new_data)
     # keltner channel
     new_data = add_kc_info(new_data)
     # donchian channel
-    new_data = add_dc_info(new_data)
+    #new_data = add_dc_info(new_data)
     # moving average convergence divergence
     new_data = add_macd_info(new_data)
     # average directional movement index
     new_data = add_adx_info(new_data)
     # vortex indicator
-    new_data = add_vi_info(new_data)
+    #new_data = add_vi_info(new_data)
     # trix indicator
     new_data = add_trix_info(new_data)
     # mass index
@@ -829,37 +816,37 @@ def add_features(data):
     # commodity channel index
     new_data = add_cci_info(new_data)
     # detrended price oscillator
-    new_data = add_dpo_info(new_data)
+    #new_data = add_dpo_info(new_data)
     # kst oscillator
     new_data = add_kst_info(new_data)
     # ichimoku kinko hyo
-    new_data = add_ichimoku_info(new_data)
+    #new_data = add_ichimoku_info(new_data)
     # parabolic stop and reverse
     new_data = add_psar_info(new_data)
     # true strength index
     new_data = add_tsi_info(new_data)
     # ultimate oscillator
-    new_data = add_uo_info(new_data)
+    #new_data = add_uo_info(new_data)
     # stochastic oscillator
-    new_data = add_so_info(new_data)
+    #new_data = add_so_info(new_data)
     # williams %R
     new_data = add_wr_info(new_data)
     # awesome oscillator
-    new_data = add_ao_info(new_data)
+    #new_data = add_ao_info(new_data)
     # kaufman's adaptive moving average
     new_data = add_kama_info(new_data)
     # rate of change
     new_data = add_roc_info(new_data)
     # daily return
-    new_data = add_dr_info(new_data)
+    #new_data = add_dr_info(new_data)
     # daily log return
-    new_data = add_dlr_info(new_data)
+    #new_data = add_dlr_info(new_data)
     # cumulative return
-    new_data = add_cr_info(new_data)
+    #new_data = add_cr_info(new_data)
 
     return new_data
 
-def plot_data(data, days, close, cols):
+def plot_data(data, days, close, cols, filename):
     x = range(days)
     count = 0
     plt.figure()
@@ -905,92 +892,26 @@ def plot_data(data, days, close, cols):
         else:
             ax[count].legend([col, close])
         count += 1
-    plt.savefig('pattern.png')
+    plt.savefig(filename)
 
-
-class Model:
-    def __init__(self, columns):
-        self.features = [x for x in columns if 'pre_' in x]
-        self.targets = ['pct_chg%d' % (i + 1) for i in range(predict_days)]
-        self.predict_features = [x.replace('pre_', '') for x in self.features]
-
-        self.params = {
-            'n_estimators': range(100, 1000, 100),
-            'max_depth': range(3, 7, 1),
-            'gamma': np.arange(0, 5, 0.5),
-            'min_child_weight': range(1, 10, 1),
-            'subsample': np.arange(0.6, 1, 0.1),
-            'colsample_bytree': np.arange(0.1, 1, 0.1)
-        }
-
-        self.xgb = XGBRegressor(learning_rate=0.02, objective='reg:squarederror', n_jobs=6)
-        self.models = []
-        for i in range(predict_days):
-            model = RandomizedSearchCV(self.xgb, param_distributions=self.params, n_iter=10, n_jobs=6, cv=KFold(shuffle=True, random_state=1992), verbose=3, random_state=1992)
-            self.models.append(model)
-
-        self.days = predict_days
-
-    def train(self, data):
-        for i in range(self.days):
-            print("start training pct_chg%d data length: %d" % (i + 1, len(data)))
-            self.models[i].fit(data[self.features].to_numpy(), data[self.targets[i]].to_numpy())
-            print("done training pct_chg%d data length: %d" % (i + 1, len(data)))
-
-    def predict(self, data):
-        pct_chg = []
-        print("today:", data[self.predict_features].iloc[0].to_frame())
-        for i in range(self.days):
-            pct_chg.append(self.models[i].predict(data[self.predict_features].iloc[0].to_numpy().reshape(1, -1))[0])
-
-        return pct_chg
-
-    def plot(self, data, days, stock):
-        dots = days + self.days
-        x = range(1, dots + 1)
-        y = [d for d in reversed(data.iloc[0:days]['close'].tolist())]
-        pct_chg = self.predict(data)
-        print(pct_chg)
-        print("last day close: %s" % y[-1])
-        for chg in pct_chg:
-            y.append(y[-1] * (1 + chg / 100))
-            print("predict: %s" % y[-1])
-
-        plt.figure()
-        sns.lineplot(x=x, y=y)
-        sns.lineplot(x=x[:days], y=y[:days])
-        plt.savefig('%s.png' % stock)
-
-    def feature_importance(self):
-        count = 1
-        for model in self.models:
-            #print(model.best_estimator_.feature_importances_)
-            feature_map = list(zip(self.predict_features, model.best_estimator_.feature_importances_))
-            fi = sorted(feature_map, key=lambda v : v[1], reverse=True)
-            fi = [v[0] for v in fi]
-            print("day%d percent change feature importance: %s\n" % (count, ' => '.join(fi)))
-            count += 1
-
+def clear_directory(dirname):
+    files = glob.glob("%s/*" % dirname)
+    for fname in files:
+        os.remove(fname)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--stock', type=str, default='000519.SZ')
-    parser.add_argument('--update_data', action='store_true')
-    parser.set_defaults(update_data=False)
-    args = parser.parse_args()
-    filename = "data/%s.csv" % args.stock
-    if args.update_data:
-        data = get_stock_data(stock, filename)
-    else:
-        data = pd.read_csv(filename)
-    data = data.dropna(axis=0)
-    print("data length: %d" % len(data))
-    data = add_features(data)
-    print("columns: %s", data.columns.tolist())
-    plot_data(data, 100, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'])
-
-    model = Model(data.columns.tolist())
-    model.train(data.iloc[predict_days - 1:-200])
-    #print(model.predict(data))
-    model.plot(data, 30, args.stock)
-    model.feature_importance()
+    clear_directory("pattern")
+    candidates = get_stock_candidates()
+    if not candidates:
+        print("today's data is not ready!!!!!")
+        sys.exit(1)
+    for cand in candidates:
+        filename = "data/%s.csv" % cand
+        print("getting data for %s" % cand)
+        data = get_stock_data(cand, filename)
+        data = data.dropna(axis=0)
+        data = add_features(data)
+        png = "pattern/%s.png" % cand
+        print("plotting picture for %s" % cand)
+        plot_data(data, 100, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
+        print("="*20, "DONE", "="*20)
