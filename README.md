@@ -27,3 +27,5 @@ day5 percent change feature importance: sma50 => ema15 => ema10 => sma15 => ema2
 
  - 2020-09-28 update: add a lot of indicators, but **vwap30** is the only useful indicator for trading. it seems that when price crosses vwap30 and is greater than vwap30, it is time to buy. and I think vwap30 is better than rsi2.
  - 2020-09-29 update: add a lot of indicators.
+
+ - 2020-09-30 update: 所有更新已经完毕了，国庆快乐！
