@@ -29,3 +29,5 @@ day5 percent change feature importance: sma50 => ema15 => ema10 => sma15 => ema2
  - 2020-09-29 update: add a lot of indicators.
 
  - 2020-09-30 update: 所有更新已经完毕了，国庆快乐！
+
+ - 2020-10-09 update: make this project private
