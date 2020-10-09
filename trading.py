@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,9 +17,10 @@ from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
+import subprocess
 
 predict_days = 5
-api = ts.pro_api(token='your tushare token')
+api = ts.pro_api(token='your token')
 
 trading_note = """
 本邮件由程序自动发送，勿回复，谢谢！
@@ -79,8 +81,10 @@ def get_stock_data(name, store_file):
 
     return data
 
-def get_stock_candidates():
+def get_stock_candidates(use_today=True):
     today = datetime.date.today().strftime("%Y%m%d")
+    if not use_today:
+        today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y%m%d")
     df = api.trade_cal(end_date=today)
     last_trading_day = df[df.is_open == 1].iloc[-1]['cal_date']
     df = api.daily_basic(trade_date=last_trading_day)
@@ -944,9 +948,13 @@ def clear_directory(dirname):
         os.remove(fname)
 
 def send_mail():
-    msg_from = "your qq mail"
-    passwd = "qq mail authority code"
-    msg_to = "to mail"
+    clear_directory('mail')
+    cmd = 'zip -r mail/stock_png.zip pattern'
+    subprocess.call(cmd.split())
+
+    msg_from = "1285470650@qq.com"
+    passwd = "vjxmrjfhpqerbaae"
+    msg_to = "1285470650@qq.com"
 
     today = datetime.datetime.today().strftime("%Y-%m-%d")
     msg = MIMEMultipart()
@@ -956,25 +964,34 @@ def send_mail():
 
     msg.attach(MIMEText(trading_note))
 
-    plottings = glob.glob('pattern/*')
-    for fname in plottings:
+    files = glob.glob("mail/stock_png.*")
+    for fname in files:
         with open(fname, 'rb') as fp:
-            img_data = fp.read()
-            msg.attach(MIMEApplication(img_data, Name=os.path.basename(fname)))
+            data = fp.read()
+            msg.attach(MIMEApplication(data, Name='pattern.zip'))
 
     try:
         s = smtplib.SMTP('smtp.qq.com', 587)
         s.login(msg_from, passwd)
         s.sendmail(msg_from, msg_to, msg.as_string())
         print("sending mail success!")
-    except s.SMTPException as e:
+    except smtplib.SMTPException as e:
         print("sending failed:", e)
     finally:
         s.quit()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--today', action='store_true')
+    parser.add_argument('--stock', type=str)
+    parser.set_defaults(today=False)
+    args = parser.parse_args()
+
     clear_directory("pattern")
-    candidates = get_stock_candidates()
+    if args.stock:
+        candidates = args.stock.split(',')
+    else:
+        candidates = get_stock_candidates(args.today)
     if not candidates:
         print("today's data is not ready!!!!!")
         sys.exit(1)
@@ -983,7 +1000,11 @@ if __name__ == "__main__":
         print("getting data for %s" % cand)
         data = get_stock_data(cand, filename)
         data = data.dropna(axis=0)
-        data = add_features(data)
+        try:
+            data = add_features(data)
+        except:
+            print("skip %s for data is incomplete!!!" % cand)
+            continue
         png = "pattern/%s.png" % cand
         print("plotting picture for %s" % cand)
         plot_data(data, 100, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
