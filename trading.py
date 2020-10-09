@@ -20,7 +20,7 @@ from email.mime.text import MIMEText
 import subprocess
 
 predict_days = 5
-api = ts.pro_api(token='your token')
+api = ts.pro_api(token='dfbd7c823ef805be150ef0f805a855714187e227e8e715dc8cb0ba48')
 
 trading_note = """
 本邮件由程序自动发送，勿回复，谢谢！
@@ -941,20 +941,22 @@ def plot_data(data, days, close, cols, filename):
             ax[count].legend([col, close])
         count += 1
     plt.savefig(filename)
+    plt.close()
 
 def clear_directory(dirname):
     files = glob.glob("%s/*" % dirname)
     for fname in files:
         os.remove(fname)
 
-def send_mail():
+def send_mail(mail_to):
     clear_directory('mail')
     cmd = 'zip -r mail/stock_png.zip pattern'
     subprocess.call(cmd.split())
 
     msg_from = "1285470650@qq.com"
     passwd = "vjxmrjfhpqerbaae"
-    msg_to = "1285470650@qq.com"
+    msg_to = mail_to
+    print("sending mail to %s ..." % msg_to)
 
     today = datetime.datetime.today().strftime("%Y-%m-%d")
     msg = MIMEMultipart()
@@ -980,34 +982,103 @@ def send_mail():
     finally:
         s.quit()
 
+'''
+ 过滤机制：
+    1. 五日内psar与close越来越近，close有上穿趋势
+'''
+def filter_by_strategy(data, days):
+    # normalize close
+    temp_close = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+    close = StandardScaler().fit_transform(temp_close.reshape(-1, 1)).flatten()
+
+    flag = False
+    temp = data.iloc[0:days].iloc[-1::-1]['psar'].to_numpy()
+    psar = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    close_ = close[-1:-6:-1]
+    psar_ = psar[-1:-6:-1]
+    # 1.当前psar大于close，五日psar与close递增取均值，当前差加上递增均值是否大于0，如果大于0，则可能上穿
+    if psar_[-1] > close_[-1]:
+        dist = psar_ - close_
+        sum_ = 0.
+        for i in range(4):
+            sum_ += dist[i + 1] - dist[i]
+        avg = sum_ / 4.
+        if dist[-1] + avg > 0.:
+            flag = True
+    # 2.当前psar小于close，是否是五日内发生的上穿现象，如果是，则趋势可能仍在
+    if psar_[-1] < close_[-1] and psar_[0] > close_[0]:
+        flag = True
+    if not flag:
+        return False
+
+
+    # 取五日adx_pos, adx_neg均值做为POS和NEG，取五日的距离，相比前一天差值变小大于1天，则
+    # 即使psar合格但是adx趋势还没有走到
+    temp_pos = data.iloc[0:days].iloc[-1::-1]['adx_pos15'].to_numpy()
+    pos = StandardScaler().fit_transform(temp_pos.reshape(-1, 1)).flatten()
+    pos = pos[-1::-1]
+    temp_neg = data.iloc[0:days].iloc[-1::-1]['adx_neg15'].to_numpy()
+    neg = StandardScaler().fit_transform(temp_neg.reshape(-1, 1)).flatten()
+    neg = neg[-1::-1]
+    # 取五日均值做平滑
+    new_pos = []
+    new_neg = []
+    for i in range(5):
+        pos_ = np.sum(pos[i : i + 5]) / 5.
+        neg_ = np.sum(neg[i : i + 5]) / 5.
+        new_pos.append(pos_)
+        new_neg.append(neg_)
+
+    dist = np.array(new_pos) - np.array(new_neg)
+    count = 0
+    for i in range(4):
+        if dist[i] < dist[i + 1]:
+            count += 1
+        if count > 1:
+            return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--today', action='store_true')
     parser.add_argument('--stock', type=str)
+    parser.add_argument('--mail_only', action='store_true')
+    parser.add_argument('--mail', type=str, default='1285470650@qq.com')
     parser.set_defaults(today=False)
+    parser.set_defaults(mail_only=False)
     args = parser.parse_args()
 
-    clear_directory("pattern")
-    if args.stock:
-        candidates = args.stock.split(',')
-    else:
-        candidates = get_stock_candidates(args.today)
-    if not candidates:
-        print("today's data is not ready!!!!!")
-        sys.exit(1)
-    for cand in candidates:
-        filename = "data/%s.csv" % cand
-        print("getting data for %s" % cand)
-        data = get_stock_data(cand, filename)
-        data = data.dropna(axis=0)
-        try:
-            data = add_features(data)
-        except:
-            print("skip %s for data is incomplete!!!" % cand)
-            continue
-        png = "pattern/%s.png" % cand
-        print("plotting picture for %s" % cand)
-        plot_data(data, 100, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
-        print("="*20, "DONE", "="*20)
+    if not args.mail_only:
+        # 100天 plot
+        days = 100
 
-    send_mail()
+        clear_directory("pattern")
+        if args.stock:
+            candidates = args.stock.split(',')
+        else:
+            candidates = get_stock_candidates(args.today)
+        if not candidates:
+            print("today's data is not ready!!!!!")
+            sys.exit(1)
+        for cand in candidates:
+            filename = "data/%s.csv" % cand
+            print("getting data for %s" % cand)
+            data = get_stock_data(cand, filename)
+            data = data.dropna(axis=0)
+            try:
+                data = add_features(data)
+            except:
+                print("skip %s for data is incomplete!!!" % cand)
+                continue
+            if not filter_by_strategy(data, days):
+                print("filter %s by strategy!!!" % cand)
+                continue
+            png = "pattern/%s.png" % cand
+            print("plotting picture for %s" % cand)
+            plot_data(data, days, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
+            print("="*20, "DONE", "="*20)
+
+        send_mail(args.mail)
+    else:
+        send_mail(args.mail)
