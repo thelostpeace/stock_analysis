@@ -1048,6 +1048,7 @@ if __name__ == "__main__":
     parser.set_defaults(today=False)
     parser.set_defaults(mail_only=False)
     args = parser.parse_args()
+    print(args)
 
     if not args.mail_only:
         # 100天 plot
