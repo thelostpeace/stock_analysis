@@ -20,6 +20,8 @@ from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 import subprocess
 
+stock_index = ['000001.SH']
+
 predict_days = 5
 api = ts.pro_api(token='6fd0d52251fd78f819527832d0ad920feea9acd672d7f296a02efea3')
 
@@ -66,7 +68,7 @@ def check_stock_data(name):
 
     return (len(files) != 0)
 
-def get_stock_data(name, store_file):
+def get_stock_data(name):
     today = datetime.date.today()
     data = pd.DataFrame()
     end_date = today.strftime("%Y%m%d")
@@ -79,6 +81,11 @@ def get_stock_data(name, store_file):
         data = data.append(tmp)
         if len(tmp) < 5000:
             break
+
+    return data
+
+def get_index_data(name):
+    data = api.index_daily(ts_code=name)
 
     return data
 
@@ -1155,13 +1162,15 @@ if __name__ == "__main__":
         count = 1
         for cand in candidates:
             print("index %d" % count)
-            filename = "data/%s.csv" % cand
             print("getting data for %s" % cand)
-            data = get_stock_data(cand, filename)
+            if cand in stock_index:
+                data = get_index_data(cand)
+            else:
+                data = get_stock_data(cand)
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if not filter_by_strategy3(data, days):
+                if cand not in stock_index and not filter_by_strategy3(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
