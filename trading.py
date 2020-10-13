@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import glob
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
 import tushare as ts
 import datetime
 import argparse
@@ -20,7 +21,7 @@ from email.mime.text import MIMEText
 import subprocess
 
 predict_days = 5
-api = ts.pro_api(token='dfbd7c823ef805be150ef0f805a855714187e227e8e715dc8cb0ba48')
+api = ts.pro_api(token='6fd0d52251fd78f819527832d0ad920feea9acd672d7f296a02efea3')
 
 trading_note = """
 本邮件由程序自动发送，勿回复，谢谢！
@@ -85,6 +86,7 @@ def get_stock_candidates(use_today=True):
     today = datetime.date.today().strftime("%Y%m%d")
     if not use_today:
         today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y%m%d")
+    print('get stock candidates of %s' % today)
     df = api.trade_cal(end_date=today)
     last_trading_day = df[df.is_open == 1].iloc[-1]['cal_date']
     df = api.daily_basic(trade_date=last_trading_day)
@@ -508,7 +510,7 @@ def add_macd_info(data):
 
 def add_adx_info(data):
     new_data = data.reset_index(drop=True)
-    days = [2,5,10,15,20,30]
+    days = [2,5,10,15,20,30,14,10]
     for day in days:
         adx = ta.trend.ADXIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
         col = "adx%d" % day
@@ -986,7 +988,7 @@ def send_mail(mail_to):
  过滤机制：
     1. 五日内psar与close越来越近，close有上穿趋势
 '''
-def filter_by_strategy(data, days):
+def filter_by_strategy1(data, days):
     # normalize close
     temp_close = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
     close = StandardScaler().fit_transform(temp_close.reshape(-1, 1)).flatten()
@@ -997,27 +999,26 @@ def filter_by_strategy(data, days):
     close_ = close[-1:-6:-1]
     psar_ = psar[-1:-6:-1]
     # 1.当前psar大于close，五日psar与close递增取均值，当前差加上递增均值是否大于0，如果大于0，则可能上穿
-    if psar_[-1] > close_[-1]:
-        dist = psar_ - close_
+    if psar_[0] > close_[0]:
+        dist = close_ - psar_
         sum_ = 0.
         for i in range(4):
-            sum_ += dist[i + 1] - dist[i]
+            sum_ += dist[i] - dist[i + 1]
         avg = sum_ / 4.
-        if dist[-1] + avg > 0.:
+        if dist[0] + avg > 0.:
             flag = True
     # 2.当前psar小于close，是否是五日内发生的上穿现象，如果是，则趋势可能仍在
-    if psar_[-1] < close_[-1] and psar_[0] > close_[0]:
+    if psar_[0] < close_[0] and psar_[-1] > close_[-1]:
         flag = True
     if not flag:
         return False
 
-
     # 取五日adx_pos, adx_neg均值做为POS和NEG，取五日的距离，相比前一天差值变小大于1天，则
     # 即使psar合格但是adx趋势还没有走到
-    temp_pos = data.iloc[0:days].iloc[-1::-1]['adx_pos15'].to_numpy()
+    temp_pos = data.iloc[0:days].iloc[-1::-1]['adx_pos14'].to_numpy()
     pos = StandardScaler().fit_transform(temp_pos.reshape(-1, 1)).flatten()
     pos = pos[-1::-1]
-    temp_neg = data.iloc[0:days].iloc[-1::-1]['adx_neg15'].to_numpy()
+    temp_neg = data.iloc[0:days].iloc[-1::-1]['adx_neg14'].to_numpy()
     neg = StandardScaler().fit_transform(temp_neg.reshape(-1, 1)).flatten()
     neg = neg[-1::-1]
     # 取五日均值做平滑
@@ -1036,6 +1037,94 @@ def filter_by_strategy(data, days):
             count += 1
         if count > 1:
             return False
+
+    return True
+'''
+ 1. 用2周期RSI过滤，看买点
+'''
+def filter_by_strategy2(data, days):
+    flag = False
+    rsi2 = data.iloc[0:days]['rsi2'].to_numpy()
+    max_ = np.amax(rsi2)
+    min_ = np.amin(rsi2)
+    if (data.iloc[0]['rsi2'] - min_) / (max_ - min_) < 0.1:
+        flag = True
+    if not flag:
+        return flag
+
+    return True
+
+'''
+ 1. 取15日vwap 做整体趋势控制，再考虑kama和psar上穿情况
+'''
+def filter_by_strategy3(data, days):
+    # 1. boll_wband < 0.3
+    boll_wd = data.iloc[0:days]['boll_wband20'].to_numpy()
+    boll_max = np.amax(boll_wd)
+    boll_min = np.amin(boll_wd)
+    if (boll_wd[0] - boll_min) / (boll_max - boll_min) > 0.05:
+        return False
+
+    # normalize close
+    temp_close = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+    close = StandardScaler().fit_transform(temp_close.reshape(-1, 1)).flatten()
+
+    vwap_flag = False
+    temp = data.iloc[0:days].iloc[-1::-1]['vwap30'].to_numpy()
+    vwap = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    close_ = close[-1:-6:-1]
+    vwap_ = vwap[-1:-6:-1]
+    # 1.当前vwap大于close，五日psar与close递增取均值，当前差加上递增均值是否大于0，如果大于0，则可能上穿
+    if vwap_[0] > close_[0]:
+        dist = close_ - vwap_
+        sum_ = 0.
+        for i in range(4):
+            sum_ += dist[i] - dist[i + 1]
+        avg = sum_ / 4.
+        if dist[0] + avg > 0.:
+            vwap_flag = True
+    # 2.当前vwap小于close，是否是五日内发生的上穿现象，如果是，则趋势可能仍在
+    if vwap_[0] < close_[0] and vwap_[-1] > close_[-1]:
+        vwap_flag = True
+
+    psar_flag = False
+    temp = data.iloc[0:days].iloc[-1::-1]['psar'].to_numpy()
+    psar = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    close_ = close[-1:-6:-1]
+    psar_ = psar[-1:-6:-1]
+    # 1.当前psar大于close，五日psar与close递增取均值，当前差加上递增均值是否大于0，如果大于0，则可能上穿
+    if psar_[0] > close_[0]:
+        dist = close_ - psar_
+        sum_ = 0.
+        for i in range(4):
+            sum_ += dist[i] - dist[i + 1]
+        avg = sum_ / 4.
+        if dist[0] + avg > 0.:
+            psar_flag = True
+    # 2.当前psar小于close，是否是五日内发生的上穿现象，如果是，则趋势可能仍在
+    if psar_[0] < close_[0] and psar_[-1] > close_[-1]:
+        psar_flag = True
+
+    kama_flag = False
+    temp = data.iloc[0:days].iloc[-1::-1]['kama'].to_numpy()
+    kama = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    close_ = close[-1:-6:-1]
+    kama_ = kama[-1:-6:-1]
+    # 1.当前kama大于close，五日kama与close递增取均值，当前差加上递增均值是否大于0，如果大于0，则可能上穿
+    if kama_[0] > close_[0]:
+        dist = close_ - kama_
+        sum_ = 0.
+        for i in range(4):
+            sum_ += dist[i] - dist[i + 1]
+        avg = sum_ / 4.
+        if dist[0] + avg > 0.:
+            kama_flag = True
+    # 2.当前kama小于close，是否是五日内发生的上穿现象，如果是，则趋势可能仍在
+    if kama_[0] < close_[0] and kama_[-1] > close_[-1]:
+        kama_flag = True
+
+    if (not psar_flag) and (not kama_flag) and (not vwap_flag):
+        return False
 
     return True
 
@@ -1062,24 +1151,29 @@ if __name__ == "__main__":
         if not candidates:
             print("today's data is not ready!!!!!")
             sys.exit(1)
+        print("candidates: %s" % len(candidates))
+        count = 1
         for cand in candidates:
+            print("index %d" % count)
             filename = "data/%s.csv" % cand
             print("getting data for %s" % cand)
             data = get_stock_data(cand, filename)
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-            except:
-                print("skip %s for data is incomplete!!!" % cand)
+                if not filter_by_strategy3(data, days):
+                    print("filter %s by strategy!!!" % cand)
+                    continue
+                png = "pattern/%s.png" % cand
+                print("plotting picture for %s" % cand)
+                plot_data(data, days, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx14', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
+                print("="*20, "DONE", "="*20)
+            except Exception as e:
+                print("skip %s for exception!!! (%s)" % (cand, e))
                 continue
-            if not filter_by_strategy(data, days):
-                print("filter %s by strategy!!!" % cand)
-                continue
-            png = "pattern/%s.png" % cand
-            print("plotting picture for %s" % cand)
-            plot_data(data, days, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx15', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
-            print("="*20, "DONE", "="*20)
+            finally:
+                count += 1
 
-        send_mail(args.mail)
+        #send_mail(args.mail)
     else:
         send_mail(args.mail)
