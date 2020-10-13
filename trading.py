@@ -1161,7 +1161,7 @@ if __name__ == "__main__":
         print("candidates: %s" % len(candidates))
         count = 1
         for cand in candidates:
-            print("index %d" % count)
+            print("index %d of %d" % (count, len(candidates)))
             print("getting data for %s" % cand)
             if cand in stock_index:
                 data = get_index_data(cand)
