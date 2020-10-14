@@ -946,6 +946,11 @@ def plot_data(data, days, close, cols, filename):
             vals = data.iloc[0:days].iloc[-1::-1]['stoch_signal%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             ax[count].legend([col, close, 'stoch_signal'])
+        elif 'boll_wband' in col:
+            day = col.replace('boll_wband', '')
+            vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            ax[count].legend([col, close, 'boll_mavg'])
         else:
             ax[count].legend([col, close])
         count += 1
@@ -1065,11 +1070,19 @@ def filter_by_strategy2(data, days):
  1. 取15日vwap 做整体趋势控制，再考虑kama和psar上穿情况
 '''
 def filter_by_strategy3(data, days):
+    # filter price < 5.0.
+    if data.iloc[0]['close'] < 5.:
+        return False
+
+    # filter volume < 200000.
+    if data.iloc[0]['vol'] < 200000.:
+        return False
+
     # 1. boll_wband < 0.3
     boll_wd = data.iloc[0:days]['boll_wband20'].to_numpy()
     boll_max = np.amax(boll_wd)
     boll_min = np.amin(boll_wd)
-    if (boll_wd[0] - boll_min) / (boll_max - boll_min) > 0.05:
+    if (boll_wd[0] - boll_min) / (boll_max - boll_min) > 0.08:
         return False
 
     # normalize close
@@ -1131,6 +1144,17 @@ def filter_by_strategy3(data, days):
         kama_flag = True
 
     if (not psar_flag) and (not kama_flag) and (not vwap_flag):
+        return False
+
+    # 1. 5日内close上穿boll_mavg20
+    boll_flag = False
+    temp = data.iloc[0:days].iloc[-1::-1]['boll_mavg20'].to_numpy()
+    boll_mavg = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    close_ = close[-1:-6:-1]
+    boll_mavg_ = boll_mavg[-1:-6:-1]
+    if boll_mavg_[0] < close_[0] and boll_mavg_[-1] > close_[-1]:
+        boll_flag = True
+    if not boll_flag:
         return False
 
     return True
