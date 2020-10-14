@@ -829,7 +829,7 @@ def add_features(data):
     # previous day info
     #new_data = add_preday_info(new_data)
     # moving average info
-    #new_data = add_ma_info(new_data)
+    new_data = add_ma_info(new_data)
     # rsi info
     new_data = add_rsi_info(new_data)
     # crossover of moving average
@@ -911,48 +911,50 @@ def plot_data(data, days, close, cols, filename):
     for col in cols:
         vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
         vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
+        vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
         sns.lineplot(x=x, y=StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten(), ax=ax[count])
         sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
+        sns.lineplot(x=x, y=StandardScaler().fit_transform(vals3.reshape(-1,1)).flatten(), ax=ax[count])
         if 'cmf' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'adi'])
+            ax[count].legend([col, close, 'ema5', 'adi'])
         elif 'macd' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['macd_signal'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'macd_signal'])
+            ax[count].legend([col, close, 'ema5', 'macd_signal'])
         elif 'adx' in col:
             day = col.replace('adx', '')
             vals = data.iloc[0:days].iloc[-1::-1]['adx_pos%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             vals = data.iloc[0:days].iloc[-1::-1]['adx_neg%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, '+DMI', '-DMI'])
+            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI'])
         elif 'vi_diff' in col:
             day = col.replace('vi_diff', '')
             vals = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             vals = data.iloc[0:days].iloc[-1::-1]['vi_neg%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, '+VI', '-VI'])
+            ax[count].legend([col, close, 'ema5', '+VI', '-VI'])
         elif 'kst' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['kst_diff'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             vals = data.iloc[0:days].iloc[-1::-1]['kst_sig'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'kst_diff', 'kst_sig'])
+            ax[count].legend([col, close, 'ema5', 'kst_diff', 'kst_sig'])
         elif 'stoch' in col:
             day = col.replace('stoch', '')
             vals = data.iloc[0:days].iloc[-1::-1]['stoch_signal%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'stoch_signal'])
+            ax[count].legend([col, close, 'ema5', 'stoch_signal'])
         elif 'boll_wband' in col:
             day = col.replace('boll_wband', '')
             vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'boll_mavg'])
+            ax[count].legend([col, close, 'ema5', 'boll_mavg'])
         else:
-            ax[count].legend([col, close])
+            ax[count].legend([col, close, 'ema5'])
         count += 1
     plt.savefig(filename)
     plt.close()
@@ -1086,7 +1088,7 @@ def filter_by_strategy3(data, days):
         return False
 
     # normalize close
-    temp_close = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+    temp_close = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
     close = StandardScaler().fit_transform(temp_close.reshape(-1, 1)).flatten()
 
     vwap_flag = False
@@ -1165,8 +1167,10 @@ if __name__ == "__main__":
     parser.add_argument('--stock', type=str)
     parser.add_argument('--mail_only', action='store_true')
     parser.add_argument('--mail', type=str, default='1285470650@qq.com')
+    parser.add_argument('--not_filter', action='store_true')
     parser.set_defaults(today=False)
     parser.set_defaults(mail_only=False)
+    parser.set_defaults(not_filter=False)
     args = parser.parse_args()
     print(args)
 
@@ -1194,7 +1198,7 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not filter_by_strategy3(data, days):
+                if cand not in stock_index and not filter_by_strategy3(data, days) and not args.not_filter:
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
