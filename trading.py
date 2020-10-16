@@ -11,7 +11,7 @@ import datetime
 import argparse
 import math
 import ta
-import os, sys
+import os, sys, random
 import smtplib
 import imghdr
 from email.message import EmailMessage
@@ -97,8 +97,8 @@ def get_stock_candidates(use_today=True):
     df = api.trade_cal(end_date=today)
     last_trading_day = df[df.is_open == 1].iloc[-1]['cal_date']
     df = api.daily_basic(trade_date=last_trading_day)
-    # 选取量比在1.8以上，换手率3以上，价格小于50的股票
-    candidates = df[(df.close < 50) & (df.volume_ratio > 1.8) & (df.turnover_rate_f > 3)]['ts_code'].tolist()
+    # 选取量在20w以上的, 价格在5-50之间的
+    candidates = df[(df.float_share * df.turnover_rate_f > 200000.) & (df.close > 5.) & (df.close < 50.)]["ts_code"].tolist()
 
     return candidates
 
@@ -283,7 +283,7 @@ def add_long_crossover_info(data):
 def add_bollinger_band_info(data):
     new_data = data.reset_index(drop=True)
     #N = [20, 14, 12, 10, 5, 4, 3, 2]
-    N = [20]
+    N = [20, 10]
     for n in N:
         bb = ta.volatility.BollingerBands(close=new_data.iloc[-1::-1].close, n=n, ndev=2)
         col = 'boll_hband%d' % n
@@ -824,6 +824,17 @@ def add_cr_info(data):
 
     return new_data
 
+def add_mfi_info(data):
+    new_data = data.reset_index(drop=True)
+    mfi = ta.volume.MFIIndicator(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, volume=new_data.iloc[-1::-1].vol, n=5)
+    col = "mfi"
+    new_data[col] = mfi.money_flow_index()
+    temp = new_data.iloc[1:][col].tolist()
+    temp.append(np.nan)
+    new_data["pre_%s" % col] = temp
+
+    return new_data
+
 def add_features(data):
     new_data = data.reset_index(drop=True)
     # previous day info
@@ -831,7 +842,7 @@ def add_features(data):
     # moving average info
     new_data = add_ma_info(new_data)
     # rsi info
-    new_data = add_rsi_info(new_data)
+    #new_data = add_rsi_info(new_data)
     # crossover of moving average
     #new_data = add_crossover_info(new_data)
     # long crossover of moving average
@@ -853,68 +864,81 @@ def add_features(data):
     # negative volume index
     #new_data = add_nvi_info(new_data)
     # volume weighted average price
-    new_data = add_vwap_info(new_data)
+    #new_data = add_vwap_info(new_data)
     # average true range
     #new_data = add_atr_info(new_data)
     # keltner channel
-    new_data = add_kc_info(new_data)
+    #new_data = add_kc_info(new_data)
     # donchian channel
     #new_data = add_dc_info(new_data)
     # moving average convergence divergence
-    new_data = add_macd_info(new_data)
+    #new_data = add_macd_info(new_data)
     # average directional movement index
     new_data = add_adx_info(new_data)
     # vortex indicator
     #new_data = add_vi_info(new_data)
     # trix indicator
-    new_data = add_trix_info(new_data)
+    #new_data = add_trix_info(new_data)
     # mass index
-    new_data = add_mi_info(new_data)
+    #new_data = add_mi_info(new_data)
     # commodity channel index
-    new_data = add_cci_info(new_data)
+    #new_data = add_cci_info(new_data)
     # detrended price oscillator
     #new_data = add_dpo_info(new_data)
     # kst oscillator
-    new_data = add_kst_info(new_data)
+    #new_data = add_kst_info(new_data)
     # ichimoku kinko hyo
     #new_data = add_ichimoku_info(new_data)
     # parabolic stop and reverse
     new_data = add_psar_info(new_data)
     # true strength index
-    new_data = add_tsi_info(new_data)
+    #new_data = add_tsi_info(new_data)
     # ultimate oscillator
     #new_data = add_uo_info(new_data)
     # stochastic oscillator
     #new_data = add_so_info(new_data)
     # williams %R
-    new_data = add_wr_info(new_data)
+    #new_data = add_wr_info(new_data)
     # awesome oscillator
     #new_data = add_ao_info(new_data)
     # kaufman's adaptive moving average
-    new_data = add_kama_info(new_data)
+    #new_data = add_kama_info(new_data)
     # rate of change
-    new_data = add_roc_info(new_data)
+    #new_data = add_roc_info(new_data)
     # daily return
     #new_data = add_dr_info(new_data)
     # daily log return
     #new_data = add_dlr_info(new_data)
     # cumulative return
     #new_data = add_cr_info(new_data)
+    # money flow index
+    #new_data = add_mfi_info(new_data)
 
     return new_data
 
 def plot_data(data, days, close, cols, filename):
-    x = range(days)
+    x = [i for i in range(days)]
     count = 0
     plt.figure()
     fig, ax = plt.subplots(len(cols), figsize=[6.4 * 3, 4 * len(cols)])
+    if not isinstance(ax, np.ndarray):
+        ax = [ax]
     for col in cols:
-        vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
-        vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
-        vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
-        sns.lineplot(x=x, y=StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten(), ax=ax[count])
-        sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
-        sns.lineplot(x=x, y=StandardScaler().fit_transform(vals3.reshape(-1,1)).flatten(), ax=ax[count])
+        if 'ema' not in col:
+            vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
+            vals1 = StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten()
+            max_ = np.amax(vals1)
+            min_ = np.amin(vals1)
+            vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
+            vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
+            sns.lineplot(x=x, y=vals1, ax=ax[count])
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
+            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals3.reshape(-1,1)).flatten(), ax=ax[count])
+        else:
+            vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
+            vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
+            sns.lineplot(x=x, y=vals3, ax=ax[count])
+            sns.lineplot(x=x, y=vals2, ax=ax[count])
         if 'cmf' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
@@ -925,17 +949,31 @@ def plot_data(data, days, close, cols, filename):
             ax[count].legend([col, close, 'ema5', 'macd_signal'])
         elif 'adx' in col:
             day = col.replace('adx', '')
-            vals = data.iloc[0:days].iloc[-1::-1]['adx_pos%s' % day].to_numpy()
-            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            vals = data.iloc[0:days].iloc[-1::-1]['adx_neg%s' % day].to_numpy()
-            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI'])
+            pos_ = data.iloc[0:days].iloc[-1::-1]['adx_pos%s' % day].to_numpy()
+            pos_ = StandardScaler().fit_transform(pos_.reshape(-1,1)).flatten()
+            max_ = np.amax(pos_)
+            sns.lineplot(x=x, y=pos_, ax=ax[count])
+            neg_ = data.iloc[0:days].iloc[-1::-1]['adx_neg%s' % day].to_numpy()
+            neg_ = StandardScaler().fit_transform(neg_.reshape(-1,1)).flatten()
+            min_ = np.amin(neg_)
+            sns.lineplot(x=x, y=neg_, ax=ax[count])
+            # scatter plot
+            y = [min_]
+            for i in range(1, days):
+                if pos_[i] > neg_[i] and pos_[i-1] < neg_[i-1]:
+                    y.append(max_)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI', 'buy'])
         elif 'vi_diff' in col:
             day = col.replace('vi_diff', '')
-            vals = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
-            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            vals = data.iloc[0:days].iloc[-1::-1]['vi_neg%s' % day].to_numpy()
-            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
+            pos_ = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
+            pos_ = StandardScaler().fit_transform(neg_.reshape(-1,1)).flatten()
+            sns.lineplot(x=x, y=pos_, ax=ax[count])
+            neg_ = data.iloc[0:days].iloc[-1::-1]['vi_neg%s' % day].to_numpy()
+            neg_ = StandardScaler().fit_transform(neg_.reshape(-1,1)).flatten()
+            sns.lineplot(x=x, y=neg_, ax=ax[count])
             ax[count].legend([col, close, 'ema5', '+VI', '-VI'])
         elif 'kst' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['kst_diff'].to_numpy()
@@ -953,6 +991,65 @@ def plot_data(data, days, close, cols, filename):
             vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             ax[count].legend([col, close, 'ema5', 'boll_mavg'])
+        elif 'boll_pband' in col:
+            day = col.replace('boll_pband', '')
+            vals = data.iloc[0:days].iloc[-1::-1]['boll_pband%s' % day].to_numpy()
+            y = []
+            for i in range(days):
+                if vals[i] < 0.2 or vals[i] > 0.8:
+                    y.append(max_)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend([col, close, 'ema5', 'buy'])
+        elif 'rsi' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['rsi2'].to_numpy()
+            y = []
+            for v in vals:
+                if v > 80.:
+                    y.append(max_)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend([col, close, 'ema5', 'buy'])
+        elif 'mfi' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['mfi'].to_numpy()
+            print("mfi:", vals)
+            y = []
+            for v in vals:
+                if v > 80.:
+                    y.append(1.)
+                elif v < 20.:
+                    y.append(0.)
+                else:
+                    y.append(-1.)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend([col, close, 'ema5', 'buy'])
+        elif 'ema' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['ema10'].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['ema15'].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['ema20'].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['ema30'].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            # scatter break through
+            period = 10
+            ema_ = data.iloc[0:days].iloc[-1::-1]['ema%d' % period].to_numpy()
+            close_ = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+            min_ = np.amin(close_)
+            max_ = np.amax(close_)
+            y = [min_] * period
+            for i in range(period, days):
+                appended = False
+                if close_[i] > ema_[i] and close_[i-1] < ema_[i-1]:
+                    y.append(max_)
+                    appended = True
+                if not appended:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend(['ema5', close, 'ema10', 'ema15', 'ema20', 'ema30', 'break'])
         else:
             ax[count].legend([col, close, 'ema5'])
         count += 1
@@ -1161,6 +1258,23 @@ def filter_by_strategy3(data, days):
 
     return True
 
+'''
+ 1. 取adx相交做为buy signal
+'''
+def filter_by_strategy4(data, days):
+    # filter by ADX
+    adx_flag = False
+    adx_pos = data.iloc[0:days]['adx_pos14'].to_numpy()
+    adx_pos = StandardScaler().fit_transform(adx_pos.reshape(-1, 1)).flatten()
+    adx_neg = data.iloc[0:days]['adx_neg14'].to_numpy()
+    adx_neg = StandardScaler().fit_transform(adx_neg.reshape(-1, 1)).flatten()
+    if adx_pos[0] > adx_neg[0] and adx_pos[1] < adx_neg[1]:
+        adx_flag = True
+    if not adx_flag:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--today', action='store_true')
@@ -1168,9 +1282,12 @@ if __name__ == "__main__":
     parser.add_argument('--mail_only', action='store_true')
     parser.add_argument('--mail', type=str, default='1285470650@qq.com')
     parser.add_argument('--not_filter', action='store_true')
+    parser.add_argument('--random', action='store_true')
+    parser.add_argument('--limit', type=int, default=-1)
     parser.set_defaults(today=False)
     parser.set_defaults(mail_only=False)
     parser.set_defaults(not_filter=False)
+    parser.set_defaults(random=False)
     args = parser.parse_args()
     print(args)
 
@@ -1187,7 +1304,11 @@ if __name__ == "__main__":
             print("today's data is not ready!!!!!")
             sys.exit(1)
         print("candidates: %s" % len(candidates))
+        if args.random:
+            random.shuffle(candidates)
+
         count = 1
+        limit = 0
         for cand in candidates:
             print("index %d of %d" % (count, len(candidates)))
             print("getting data for %s" % cand)
@@ -1198,16 +1319,21 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not filter_by_strategy3(data, days) and not args.not_filter:
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy4(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
                 print("plotting picture for %s" % cand)
-                plot_data(data, days, 'close', ['rsi2', 'boll_wband20', 'vwap30', 'kc_wband15', 'macd', 'adx14', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
+                #plot_data(data, days, 'close', ['rsi2', 'boll_wband10', 'boll_pband10', 'mfi', 'vwap30', 'kc_wband15', 'macd', 'adx14', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
+                plot_data(data, days, 'close', ['ema5', 'psar', 'adx14', 'boll_pband20'], png)
                 print("="*20, "DONE", "="*20)
+                limit += 1
+                if args.limit != -1 and limit >= args.limit:
+                    break
             except Exception as e:
                 print("skip %s for exception!!! (%s)" % (cand, e))
                 continue
+                #raise
             finally:
                 count += 1
 
