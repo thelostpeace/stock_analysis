@@ -942,11 +942,11 @@ def plot_data(data, days, close, cols, filename):
         if 'cmf' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'adi'])
+            ax[count].legend([col, close, 'ema5', 'adi'], loc='upper left')
         elif 'macd' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['macd_signal'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'macd_signal'])
+            ax[count].legend([col, close, 'ema5', 'macd_signal'], loc='upper left')
         elif 'adx' in col:
             day = col.replace('adx', '')
             pos_ = data.iloc[0:days].iloc[-1::-1]['adx_pos%s' % day].to_numpy()
@@ -965,7 +965,7 @@ def plot_data(data, days, close, cols, filename):
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI', 'buy'])
+            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI', 'buy'], loc='upper left')
         elif 'vi_diff' in col:
             day = col.replace('vi_diff', '')
             pos_ = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
@@ -974,23 +974,23 @@ def plot_data(data, days, close, cols, filename):
             neg_ = data.iloc[0:days].iloc[-1::-1]['vi_neg%s' % day].to_numpy()
             neg_ = StandardScaler().fit_transform(neg_.reshape(-1,1)).flatten()
             sns.lineplot(x=x, y=neg_, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', '+VI', '-VI'])
+            ax[count].legend([col, close, 'ema5', '+VI', '-VI'], loc='upper left')
         elif 'kst' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['kst_diff'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             vals = data.iloc[0:days].iloc[-1::-1]['kst_sig'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'kst_diff', 'kst_sig'])
+            ax[count].legend([col, close, 'ema5', 'kst_diff', 'kst_sig'], loc='upper left')
         elif 'stoch' in col:
             day = col.replace('stoch', '')
             vals = data.iloc[0:days].iloc[-1::-1]['stoch_signal%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'stoch_signal'])
+            ax[count].legend([col, close, 'ema5', 'stoch_signal'], loc='upper left')
         elif 'boll_wband' in col:
             day = col.replace('boll_wband', '')
             vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'boll_mavg'])
+            ax[count].legend([col, close, 'ema5', 'boll_mavg'], loc='upper left')
         elif 'boll_pband' in col:
             day = col.replace('boll_pband', '')
             vals = data.iloc[0:days].iloc[-1::-1]['boll_pband%s' % day].to_numpy()
@@ -1001,7 +1001,7 @@ def plot_data(data, days, close, cols, filename):
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'buy'])
+            ax[count].legend([col, close, 'ema5', 'buy'], loc='upper left')
         elif 'rsi' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['rsi2'].to_numpy()
             y = []
@@ -1011,7 +1011,7 @@ def plot_data(data, days, close, cols, filename):
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'buy'])
+            ax[count].legend([col, close, 'ema5', 'buy'], loc='upper left')
         elif 'mfi' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['mfi'].to_numpy()
             print("mfi:", vals)
@@ -1024,7 +1024,7 @@ def plot_data(data, days, close, cols, filename):
                 else:
                     y.append(-1.)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'buy'])
+            ax[count].legend([col, close, 'ema5', 'buy'], loc='upper left')
         elif 'ema' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['ema10'].to_numpy()
             sns.lineplot(x=x, y=vals, ax=ax[count])
@@ -1049,9 +1049,9 @@ def plot_data(data, days, close, cols, filename):
                 if not appended:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend(['ema5', close, 'ema10', 'ema15', 'ema20', 'ema30', 'break'])
+            ax[count].legend(['ema5', close, 'ema10', 'ema15', 'ema20', 'ema30', 'break'], loc='upper left')
         else:
-            ax[count].legend([col, close, 'ema5'])
+            ax[count].legend([col, close, 'ema5'], loc='upper left')
         count += 1
     plt.savefig(filename)
     plt.close()
