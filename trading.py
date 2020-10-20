@@ -85,7 +85,10 @@ def get_stock_data(name):
     return data
 
 def get_index_data(name):
+    today = datetime.date.today().strftime("%Y%m%d")
     data = api.index_daily(ts_code=name)
+    if str(data.iloc[0].trade_date != today):
+        print("today's data is not ready, last trade date: %s" % data.iloc[0].trade_date)
 
     return data
 
