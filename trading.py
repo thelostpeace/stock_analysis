@@ -87,7 +87,7 @@ def get_stock_data(name):
 def get_index_data(name):
     today = datetime.date.today().strftime("%Y%m%d")
     data = api.index_daily(ts_code=name)
-    if str(data.iloc[0].trade_date != today):
+    if str(data.iloc[0].trade_date) != today:
         print("today's data is not ready, last trade date: %s" % data.iloc[0].trade_date)
 
     return data
@@ -845,7 +845,7 @@ def add_features(data):
     # moving average info
     new_data = add_ma_info(new_data)
     # rsi info
-    #new_data = add_rsi_info(new_data)
+    new_data = add_rsi_info(new_data)
     # crossover of moving average
     #new_data = add_crossover_info(new_data)
     # long crossover of moving average
@@ -919,7 +919,7 @@ def add_features(data):
 
     return new_data
 
-def plot_data(data, days, close, cols, filename):
+def plot_data(data, days, close, cols, filename, stock):
     x = [i for i in range(days)]
     count = 0
     plt.figure()
@@ -1011,6 +1011,8 @@ def plot_data(data, days, close, cols, filename):
             for v in vals:
                 if v > 80.:
                     y.append(max_)
+                elif v < 10.:
+                    y.append((max_ + min_) / 2.)
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
@@ -1056,6 +1058,7 @@ def plot_data(data, days, close, cols, filename):
         else:
             ax[count].legend([col, close, 'ema5'], loc='upper left')
         count += 1
+    fig.suptitle(stock, fontsize=40, fontweight='normal')
     plt.savefig(filename)
     plt.close()
 
@@ -1328,7 +1331,7 @@ if __name__ == "__main__":
                 png = "pattern/%s.png" % cand
                 print("plotting picture for %s" % cand)
                 #plot_data(data, days, 'close', ['rsi2', 'boll_wband10', 'boll_pband10', 'mfi', 'vwap30', 'kc_wband15', 'macd', 'adx14', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
-                plot_data(data, days, 'close', ['ema5', 'psar', 'adx14', 'boll_pband20'], png)
+                plot_data(data, days, 'close', ['ema5', 'psar', 'adx14', 'boll_pband20', 'rsi2'], png, cand)
                 print("="*20, "DONE", "="*20)
                 limit += 1
                 if args.limit != -1 and limit >= args.limit:
