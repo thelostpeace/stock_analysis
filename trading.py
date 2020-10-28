@@ -82,6 +82,9 @@ def get_stock_data(name):
         if len(tmp) < 5000:
             break
 
+    if str(data.iloc[0].trade_date) != end_date:
+        print("today's data is not ready, last trade date: %s" % data.iloc[0].trade_date)
+
     return data
 
 def get_index_data(name):
@@ -927,7 +930,12 @@ def plot_data(data, days, close, cols, filename, stock):
     if not isinstance(ax, np.ndarray):
         ax = [ax]
     for col in cols:
-        if 'ema' not in col:
+        if 'ema' in col or 'boll_band' in col:
+            vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
+            vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
+            sns.lineplot(x=x, y=vals3, ax=ax[count])
+            sns.lineplot(x=x, y=vals2, ax=ax[count])
+        else:
             vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
             vals1 = StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten()
             max_ = np.amax(vals1)
@@ -937,11 +945,6 @@ def plot_data(data, days, close, cols, filename, stock):
             sns.lineplot(x=x, y=vals1, ax=ax[count])
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals3.reshape(-1,1)).flatten(), ax=ax[count])
-        else:
-            vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
-            vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
-            sns.lineplot(x=x, y=vals3, ax=ax[count])
-            sns.lineplot(x=x, y=vals2, ax=ax[count])
         if 'cmf' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
@@ -994,13 +997,24 @@ def plot_data(data, days, close, cols, filename, stock):
             vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
             ax[count].legend([col, close, 'ema5', 'boll_mavg'], loc='upper left')
+        elif 'boll_band' in col:
+            day = col.replace('boll_band', '')
+            vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['boll_hband%s' % day].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['boll_lband%s' % day].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            ax[count].legend([col, close, 'ema5', 'boll_mavg', 'boll_hband', 'boll_lband'], loc='upper left')
         elif 'boll_pband' in col:
             day = col.replace('boll_pband', '')
             vals = data.iloc[0:days].iloc[-1::-1]['boll_pband%s' % day].to_numpy()
             y = []
             for i in range(days):
-                if vals[i] < 0.2 or vals[i] > 0.8:
+                if vals[i] > 0.8:
                     y.append(max_)
+                elif vals[i] < 0.05:
+                    y.append((max_ + min_) / 2.)
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
@@ -1060,7 +1074,7 @@ def plot_data(data, days, close, cols, filename, stock):
         count += 1
     fig.suptitle(stock, fontsize=40, fontweight='normal')
     plt.savefig(filename)
-    plt.close()
+    plt.close('all')
 
 def clear_directory(dirname):
     files = glob.glob("%s/*" % dirname)
@@ -1331,7 +1345,7 @@ if __name__ == "__main__":
                 png = "pattern/%s.png" % cand
                 print("plotting picture for %s" % cand)
                 #plot_data(data, days, 'close', ['rsi2', 'boll_wband10', 'boll_pband10', 'mfi', 'vwap30', 'kc_wband15', 'macd', 'adx14', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
-                plot_data(data, days, 'close', ['ema5', 'psar', 'adx14', 'boll_pband20', 'rsi2'], png, cand)
+                plot_data(data, days, 'close', ['ema5', 'psar', 'adx14', 'boll_pband20', 'rsi2', 'boll_band20'], png, cand)
                 print("="*20, "DONE", "="*20)
                 limit += 1
                 if args.limit != -1 and limit >= args.limit:
