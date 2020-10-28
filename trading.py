@@ -1013,7 +1013,7 @@ def plot_data(data, days, close, cols, filename, stock):
             for i in range(days):
                 if vals[i] > 0.8:
                     y.append(max_)
-                elif vals[i] < 0.05:
+                elif vals[i] < 0.1:
                     y.append((max_ + min_) / 2.)
                 else:
                     y.append(min_)
@@ -1295,6 +1295,17 @@ def filter_by_strategy4(data, days):
 
     return True
 
+'''
+ 1. 取pband < 0.1 做为buy signal
+'''
+def filter_by_strategy5(data, days):
+    # filter by boll_pband20
+    pband = data.iloc[0:days]['boll_pband20'].to_numpy()
+    if pband[0] > 0.1:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--today', action='store_true')
@@ -1339,7 +1350,7 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy4(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy5(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
