@@ -82,7 +82,7 @@ def get_stock_data(name):
         if len(tmp) < 5000:
             break
 
-    if str(data.iloc[0].trade_date) != end_date:
+    if str(data.iloc[0].trade_date) != today.strftime("%Y%m%d"):
         print("today's data is not ready, last trade date: %s" % data.iloc[0].trade_date)
 
     return data
@@ -971,7 +971,20 @@ def plot_data(data, days, close, cols, filename, stock):
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI', 'buy'], loc='upper left')
+            adx_ = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
+            adx_max = np.amax(adx_)
+            adx_min = np.amin(adx_)
+            adx_ = [(x - adx_min) / (adx_max - adx_min) for x in adx_]
+            y = []
+            for i in range(days):
+                if adx_[i] > 0.8:
+                    y.append(min_ + (max_ - min_) / 4. * 3)
+                elif adx_[i] < 0.1:
+                    y.append(min_ + (max_ - min_) / 4. * 1)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI', 'buy', 'signal'], loc='upper left')
         elif 'vi_diff' in col:
             day = col.replace('vi_diff', '')
             pos_ = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
@@ -1306,6 +1319,26 @@ def filter_by_strategy5(data, days):
 
     return True
 
+'''
+ 1. 取adx < 0.1 做为buy signal
+'''
+def filter_by_strategy6(data, days):
+    # filter by adx14
+    adx = data.iloc[0:days]['adx14'].to_numpy()
+    max_ = np.amax(adx)
+    min_ = np.amin(adx)
+    if (adx[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    # filter by price, don't pick percent of price is high
+    price = data.iloc[0:days]['close'].to_numpy()
+    max_ = np.amax(price)
+    min_ = np.amin(price)
+    if (price[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--today', action='store_true')
@@ -1350,7 +1383,7 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy5(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy6(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
