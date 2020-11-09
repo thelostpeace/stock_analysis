@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import numpy as np
 import pandas as pd
+from matplotlib import rcParams
+#rcParams['font.family'] = ['Nimbus Sans L']
 import matplotlib.pyplot as plt
 import glob
 import seaborn as sns
@@ -21,6 +23,7 @@ from email.mime.text import MIMEText
 import subprocess
 
 stock_index = ['000001.SH']
+code2name = dict()
 
 predict_days = 5
 api = ts.pro_api(token='6fd0d52251fd78f819527832d0ad920feea9acd672d7f296a02efea3')
@@ -107,6 +110,17 @@ def get_stock_candidates(use_today=True):
     candidates = df[(df.float_share * df.turnover_rate_f > 200000.) & (df.close > 5.) & (df.close < 50.)]["ts_code"].tolist()
 
     return candidates
+
+def get_code_name_map():
+    global code2name
+    global api
+    df = api.stock_basic()
+    for code, name in zip(df['ts_code'].to_list(), df['name'].to_list()):
+        code2name[code] = name
+
+    df = api.index_basic()
+    for code, name in zip(df['ts_code'].to_list(), df['name'].to_list()):
+        code2name[code] = name
 
 
 def add_preday_info(data):
@@ -1356,6 +1370,8 @@ if __name__ == "__main__":
     print(args)
 
     if not args.mail_only:
+        # 获取代码名称映射
+        get_code_name_map()
         # 100天 plot
         days = 100
 
