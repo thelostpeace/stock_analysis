@@ -21,6 +21,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 import subprocess
+import mplfinance as mpf
 
 stock_index = ['000001.SH']
 code2name = dict()
@@ -122,6 +123,63 @@ def get_code_name_map():
     for code, name in zip(df['ts_code'].to_list(), df['name'].to_list()):
         code2name[code] = name
 
+def calculate_index(days):
+    # days 交易日，最近的在前
+    today = datetime.date.today().strftime("%Y%m%d")
+    open_cal = api.trade_cal(is_open='1', end_date=today)['cal_date'].to_list()[-1::-1][:days]
+    data = pd.DataFrame()
+    trade_date_ = []
+    open_ = []
+    high_ = []
+    low_ = []
+    close_ = []
+    vol_ = []
+    amount_ = []
+    for day in open_cal:
+        df = api.daily(trade_date=day)
+        amount = df.amount.sum()
+        df['weight'] = df['amount'] / amount * 100
+        df['open'] = df['open'] * df['weight']
+        df['high'] = df['high'] * df['weight']
+        df['low'] = df['low'] * df['weight']
+        df['close'] = df['close'] * df['weight']
+        trade_date_.append(day)
+        open_.append(df.open.sum())
+        high_.append(df.high.sum())
+        low_.append(df.low.sum())
+        close_.append(df.close.sum())
+        vol_.append(df.vol.sum() / 10000.)
+        amount_.append(df.amount.sum() / 100000.)
+        #time.sleep(0.5)
+    data['Date'] = trade_date_[-1::-1]
+    data['Open'] = open_[-1::-1]
+    data['High'] = high_[-1::-1]
+    data['Low'] = low_[-1::-1]
+    data['Close'] = close_[-1::-1]
+    data['Volume'] = vol_[-1::-1]
+    data['Amount'] = amount_[-1::-1]
+
+    return data
+
+def plot_index(df, savefile):
+    df['Date'] = df['Date'].astype('datetime64[ns]')
+    df = df.set_index('Date')
+    mc = mpf.make_marketcolors(up='r', down='g')
+    style = mpf.make_mpf_style(base_mpf_style='nightclouds', marketcolors=mc)
+    wconfig = dict()
+    mpf.plot(df, type='line', volume=True, style=style, title='Chives Index', return_width_config=wconfig, ylabel='Index')
+    plt.savefig(savefile)
+    plt.close('all')
+    today = datetime.date.today().strftime("%Y%m%d")
+    trade_date = api.trade_cal(end_date=today, is_open='1')
+    print('trade date: %s' % trade_date.iloc[-1]['cal_date'])
+    print('open: %.2f' % df.iloc[-1]['Open'])
+    print('high: %.2f' % df.iloc[-1]['High'])
+    print('low: %.2f' % df.iloc[-1]['Low'])
+    print('close: %.2f' % df.iloc[-1]['Close'])
+    print('volume: %.2f万手' % df.iloc[-1]['Volume'])
+    print('amount: %.2f亿' % df.iloc[-1]['Amount'])
+    print('percent change: %.2f' % ((df.iloc[-1]['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100.))
 
 def add_preday_info(data):
     new_data = data.reset_index(drop=True)
@@ -1362,10 +1420,12 @@ if __name__ == "__main__":
     parser.add_argument('--not_filter', action='store_true')
     parser.add_argument('--random', action='store_true')
     parser.add_argument('--limit', type=int, default=-1)
+    parser.add_argument('--plot_index', action='store_true')
     parser.set_defaults(today=False)
     parser.set_defaults(mail_only=False)
     parser.set_defaults(not_filter=False)
     parser.set_defaults(random=False)
+    parser.set_defaults(plot_index=False)
     args = parser.parse_args()
     print(args)
 
@@ -1376,6 +1436,13 @@ if __name__ == "__main__":
         days = 100
 
         clear_directory("pattern")
+
+        # plot index
+        if args.plot_index:
+            data = calculate_index(days)
+            plot_index(data, 'pattern/chives_index.png')
+            sys.exit(0)
+
         if args.stock:
             candidates = args.stock.split(',')
         else:
