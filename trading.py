@@ -125,8 +125,8 @@ def get_code_name_map():
 
 def calculate_index(days):
     # days 交易日，最近的在前
-    today = datetime.date.today().strftime("%Y%m%d")
-    open_cal = api.trade_cal(is_open='1', end_date=today)['cal_date'].to_list()[-1::-1][:days]
+    last_day = api.daily().iloc[0]['trade_date']
+    open_cal = api.trade_cal(is_open='1', end_date=last_day)['cal_date'].to_list()[-1::-1][:days+20]
     data = pd.DataFrame()
     trade_date_ = []
     open_ = []
@@ -159,7 +159,12 @@ def calculate_index(days):
     data['Volume'] = vol_[-1::-1]
     data['Amount'] = amount_[-1::-1]
 
-    return data
+    bb = ta.volatility.BollingerBands(close=data['Close'], n=20, ndev=2)
+    data['BollHBand'] = bb.bollinger_hband()
+    data['BollLBand'] = bb.bollinger_lband()
+    data['BollMAvg'] = bb.bollinger_mavg()
+
+    return data.iloc[20:]
 
 def plot_index(df, savefile):
     df['Date'] = df['Date'].astype('datetime64[ns]')
@@ -167,8 +172,8 @@ def plot_index(df, savefile):
     mc = mpf.make_marketcolors(up='r', down='g', ohlc='white')
     style = mpf.make_mpf_style(base_mpf_style='nightclouds', marketcolors=mc)
     wconfig = dict()
-    apdict = mpf.make_addplot(df['Close'])
-    mpf.plot(df, type='ohlc', mav=5, volume=True, style=style, title='Chives Index', return_width_config=wconfig, ylabel='Index', figscale=2.0, tight_layout=True, addplot=apdict, scale_width_adjustment=dict(lines=0.5))
+    apdict = mpf.make_addplot(df[['BollHBand', 'BollLBand', 'BollMAvg']])
+    mpf.plot(df, type='ohlc', volume=True, style=style, title='Chives Index', return_width_config=wconfig, ylabel='Index', figscale=1.5, tight_layout=True, addplot=apdict, scale_width_adjustment=dict(lines=0.7))
     print(wconfig)
     plt.savefig(savefile)
     plt.close('all')
