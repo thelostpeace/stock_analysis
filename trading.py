@@ -126,6 +126,7 @@ def get_code_name_map():
 def calculate_index(days):
     # days 交易日，最近的在前
     last_day = api.daily().iloc[0]['trade_date']
+    print('last trade day: %s' % last_day)
     open_cal = api.trade_cal(is_open='1', end_date=last_day)['cal_date'].to_list()[-1::-1][:days+20]
     data = pd.DataFrame()
     trade_date_ = []
@@ -186,7 +187,7 @@ def plot_index(df, savefile):
     print('close: %.2f' % df.iloc[-1]['Close'])
     print('volume: %.2f万手' % df.iloc[-1]['Volume'])
     print('amount: %.2f亿' % df.iloc[-1]['Amount'])
-    print('percent change: %.2f' % ((df.iloc[-1]['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100.))
+    print('percent change: %+.2f' % ((df.iloc[-1]['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100.))
 
 def add_preday_info(data):
     new_data = data.reset_index(drop=True)
@@ -1418,6 +1419,30 @@ def filter_by_strategy6(data, days):
 
     return True
 
+'''
+ 1. 取adx < 0.1 和 psar上穿做为buy signal
+'''
+def filter_by_strategy7(data, days):
+    # filter by adx14
+    adx = data.iloc[0:days]['adx14'].to_numpy()
+    max_ = np.amax(adx)
+    min_ = np.amin(adx)
+    if (adx[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    # filter by psar
+    psar_flag = False
+    psar = data.iloc[0:days]['psar'].to_numpy()
+    psar = StandardScaler().fit_transform(psar.reshape(-1, 1)).flatten()
+    close = data.iloc[0:days]['close'].to_numpy()
+    close = StandardScaler().fit_transform(close.reshape(-1, 1)).flatten()
+    if close[0] > psar[0] and close[1] < psar[1]:
+        psar_flag = True
+    if not psar_flag:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--today', action='store_true')
@@ -1473,7 +1498,7 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy6(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy7(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
