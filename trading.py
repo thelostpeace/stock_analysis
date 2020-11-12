@@ -123,7 +123,8 @@ def get_code_name_map():
     for code, name in zip(df['ts_code'].to_list(), df['name'].to_list()):
         code2name[code] = name
 
-def calculate_index(days):
+def calculate_index(days, K):
+    global code2name
     # days 交易日，最近的在前
     last_day = api.daily().iloc[0]['trade_date']
     print('last trade day: %s' % last_day)
@@ -136,6 +137,8 @@ def calculate_index(days):
     close_ = []
     vol_ = []
     amount_ = []
+    top_K = []
+    r_top_K = []
     for day in open_cal:
         df = api.daily(trade_date=day)
         amount = df.amount.sum()
@@ -151,6 +154,19 @@ def calculate_index(days):
         close_.append(df.close.sum())
         vol_.append(df.vol.sum() / 10000.)
         amount_.append(df.amount.sum() / 100000.)
+        cand = df.sort_values('close', ascending=False).iloc[:K][['ts_code', 'pct_chg']].to_numpy()
+        top_ = ["%s%+.2f%%" % (code2name[item[0]], item[1]) for item in cand]
+        top_K.append(top_)
+        cand = df.sort_values('close', ascending=True)[['ts_code', 'pct_chg']].to_numpy()
+        temp = []
+        count = 0
+        for item in cand:
+            if item[0] in code2name:
+                temp.append("%s%+.2f%%" %(code2name[item[0]], item[1]))
+                count += 1
+            if count >= K:
+                break
+        r_top_K.append(temp)
         #time.sleep(0.5)
     data['Date'] = trade_date_[-1::-1]
     data['Open'] = open_[-1::-1]
@@ -165,9 +181,9 @@ def calculate_index(days):
     data['BollLBand'] = bb.bollinger_lband()
     data['BollMAvg'] = bb.bollinger_mavg()
 
-    return data.iloc[20:]
+    return data.iloc[20:], (top_K, r_top_K)
 
-def plot_index(df, savefile):
+def plot_index(df, top_K, savefile):
     df['Date'] = df['Date'].astype('datetime64[ns]')
     df = df.set_index('Date')
     mc = mpf.make_marketcolors(up='r', down='g', ohlc='white')
@@ -187,7 +203,9 @@ def plot_index(df, savefile):
     print('close: %.2f' % df.iloc[-1]['Close'])
     print('volume: %.2f万手' % df.iloc[-1]['Volume'])
     print('amount: %.2f亿' % df.iloc[-1]['Amount'])
-    print('percent change: %+.2f' % ((df.iloc[-1]['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100.))
+    print('percent change: %+.2f%%' % ((df.iloc[-1]['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100.))
+    print('指数占比前十: %s' % ' '.join(top_K[0][0]))
+    print('指数占比倒数前十: %s' % ' '.join(top_K[1][0]))
 
 def add_preday_info(data):
     new_data = data.reset_index(drop=True)
@@ -1471,8 +1489,8 @@ if __name__ == "__main__":
 
         # plot index
         if args.plot_index:
-            data = calculate_index(days)
-            plot_index(data, 'pattern/chives_index.png')
+            data, top_K = calculate_index(days, 10)
+            plot_index(data, top_K, 'pattern/chives_index.png')
             sys.exit(0)
 
         if args.stock:
