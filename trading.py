@@ -73,9 +73,8 @@ def check_stock_data(name):
     return (len(files) != 0)
 
 def get_stock_data(name):
-    today = datetime.date.today()
     data = pd.DataFrame()
-    end_date = today.strftime("%Y%m%d")
+    end_date = api.daily().iloc[0]['trade_date']
     while True:
         tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
         print("get data length: %d, end_date: %s" % (len(tmp), end_date))
@@ -86,26 +85,21 @@ def get_stock_data(name):
         if len(tmp) < 5000:
             break
 
-    if str(data.iloc[0].trade_date) != today.strftime("%Y%m%d"):
-        print("today's data is not ready, last trade date: %s" % data.iloc[0].trade_date)
-
     return data
 
 def get_index_data(name):
     today = datetime.date.today().strftime("%Y%m%d")
     data = api.index_daily(ts_code=name)
     if str(data.iloc[0].trade_date) != today:
-        print("today's data is not ready, last trade date: %s" % data.iloc[0].trade_date)
+        print("today's index data is not ready, last trading day is %s" % data.iloc[0].trade_date)
 
     return data
 
-def get_stock_candidates(use_today=True):
+def get_stock_candidates():
     today = datetime.date.today().strftime("%Y%m%d")
-    if not use_today:
-        today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y%m%d")
-    print('get stock candidates of %s' % today)
-    df = api.trade_cal(end_date=today)
-    last_trading_day = df[df.is_open == 1].iloc[-1]['cal_date']
+    last_trading_day = api.daily().iloc[0]['trade_date']
+    if today != last_trading_day:
+        print("today's stock data is not ready, get stock candidates of %s" % last_trading_day)
     df = api.daily_basic(trade_date=last_trading_day)
     # 选取量在20w以上的, 价格在5-50之间的
     candidates = df[(df.float_share * df.turnover_rate_f > 200000.) & (df.close > 5.) & (df.close < 50.)]["ts_code"].tolist()
@@ -1435,6 +1429,11 @@ def filter_by_strategy6(data, days):
     if (price[0] - min_) / (max_ - min_) > 0.1:
         return False
 
+    # filter by boll_pband20
+    pband = data.iloc[0:days]['boll_pband20'].to_numpy()
+    if pband[0] > 0.1:
+        return False
+
     return True
 
 '''
@@ -1463,7 +1462,6 @@ def filter_by_strategy7(data, days):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--today', action='store_true')
     parser.add_argument('--stock', type=str)
     parser.add_argument('--mail_only', action='store_true')
     parser.add_argument('--mail', type=str, default='1285470650@qq.com')
@@ -1471,7 +1469,6 @@ if __name__ == "__main__":
     parser.add_argument('--random', action='store_true')
     parser.add_argument('--limit', type=int, default=-1)
     parser.add_argument('--plot_index', action='store_true')
-    parser.set_defaults(today=False)
     parser.set_defaults(mail_only=False)
     parser.set_defaults(not_filter=False)
     parser.set_defaults(random=False)
@@ -1496,10 +1493,7 @@ if __name__ == "__main__":
         if args.stock:
             candidates = args.stock.split(',')
         else:
-            candidates = get_stock_candidates(args.today)
-        if not candidates:
-            print("today's data is not ready!!!!!")
-            sys.exit(1)
+            candidates = get_stock_candidates()
         print("candidates: %s" % len(candidates))
         if args.random:
             random.shuffle(candidates)
@@ -1516,7 +1510,7 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy7(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy6(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
