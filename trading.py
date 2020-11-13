@@ -1429,11 +1429,6 @@ def filter_by_strategy6(data, days):
     if (price[0] - min_) / (max_ - min_) > 0.1:
         return False
 
-    # filter by boll_pband20
-    pband = data.iloc[0:days]['boll_pband20'].to_numpy()
-    if pband[0] > 0.1:
-        return False
-
     return True
 
 '''
@@ -1456,6 +1451,24 @@ def filter_by_strategy7(data, days):
     if close[0] > psar[0] and close[1] < psar[1]:
         psar_flag = True
     if not psar_flag:
+        return False
+
+    return True
+
+'''
+ 1. 取adx < 0.1 and pband < 0.1做为buy signal
+'''
+def filter_by_strategy8(data, days):
+    # filter by adx14
+    adx = data.iloc[0:days]['adx14'].to_numpy()
+    max_ = np.amax(adx)
+    min_ = np.amin(adx)
+    if (adx[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    # filter by boll_pband20
+    pband = data.iloc[0:days]['boll_pband20'].to_numpy()
+    if pband[0] > 0.1:
         return False
 
     return True
@@ -1510,7 +1523,7 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy6(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy8(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
