@@ -1027,6 +1027,9 @@ def plot_data(data, days, close, cols, filename, stock):
             vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
             sns.lineplot(x=x, y=vals3, ax=ax[count])
             sns.lineplot(x=x, y=vals2, ax=ax[count])
+        elif 'vol' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
         else:
             vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
             vals1 = StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten()
@@ -1037,6 +1040,7 @@ def plot_data(data, days, close, cols, filename, stock):
             sns.lineplot(x=x, y=vals1, ax=ax[count])
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals3.reshape(-1,1)).flatten(), ax=ax[count])
+
         if 'cmf' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
             sns.lineplot(x=x, y=StandardScaler().fit_transform(vals.reshape(-1,1)).flatten(), ax=ax[count])
@@ -1174,6 +1178,18 @@ def plot_data(data, days, close, cols, filename, stock):
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
             ax[count].legend(['ema5', close, 'ema10', 'ema15', 'ema20', 'ema30', 'break'], loc='upper left')
+        elif 'vol' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
+            max_ = np.amax(vals)
+            min_ = np.amin(vals)
+            y = []
+            for val in vals:
+                if (val - min_) * 1.0 / (max_ - min_) < 0.1:
+                    y.append(max_)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend(['vol', 'buy'], loc='upper left')
         else:
             ax[count].legend([col, close, 'ema5'], loc='upper left')
         count += 1
@@ -1473,6 +1489,44 @@ def filter_by_strategy8(data, days):
 
     return True
 
+'''
+ 1. 取pband < 0.1 and vol < 0.1做为buy signal (短)
+'''
+def filter_by_strategy9(data, days):
+    # filter by vol
+    vol = data.iloc[0:days]['vol'].to_numpy()
+    max_ = np.amax(vol)
+    min_ = np.amin(vol)
+    if (vol[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    # filter by boll_pband20
+    pband = data.iloc[0:days]['boll_pband20'].to_numpy()
+    if pband[0] > 0.1:
+        return False
+
+    return True
+
+'''
+ 1. 取adx < 0.1 and vol < 0.1做为buy signal (中)
+'''
+def filter_by_strategy10(data, days):
+    # filter by vol
+    vol = data.iloc[0:days]['vol'].to_numpy()
+    max_ = np.amax(vol)
+    min_ = np.amin(vol)
+    if (vol[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    # filter by adx14
+    adx = data.iloc[0:days]['adx14'].to_numpy()
+    max_ = np.amax(adx)
+    min_ = np.amin(adx)
+    if (adx[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--stock', type=str)
@@ -1523,13 +1577,12 @@ if __name__ == "__main__":
             data = data.dropna(axis=0)
             try:
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy8(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy10(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
                 print("plotting picture for %s" % cand)
-                #plot_data(data, days, 'close', ['rsi2', 'boll_wband10', 'boll_pband10', 'mfi', 'vwap30', 'kc_wband15', 'macd', 'adx14', 'trix2', 'mi', 'cci5', 'kst', 'psar', 'tsi', 'wr15', 'kama', 'roc15'], png)
-                plot_data(data, days, 'close', ['ema5', 'psar', 'adx14', 'boll_pband20', 'rsi2', 'boll_band20'], png, cand)
+                plot_data(data, days, 'close', ['ema5', 'vol', 'psar', 'adx14', 'boll_pband20', 'boll_band20'], png, cand)
                 print("="*20, "DONE", "="*20)
                 limit += 1
                 if args.limit != -1 and limit >= args.limit:
