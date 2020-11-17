@@ -1179,12 +1179,15 @@ def plot_data(data, days, close, cols, filename, stock):
             sns.scatterplot(x=x, y=y, ax=ax[count])
             ax[count].legend(['ema5', close, 'ema10', 'ema15', 'ema20', 'ema30', 'break'], loc='upper left')
         elif 'vol' in col:
-            vals = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
-            max_ = np.amax(vals)
-            min_ = np.amin(vals)
-            y = []
-            for val in vals:
-                if (val - min_) * 1.0 / (max_ - min_) < 0.1:
+            vol_ = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
+            close_ = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+            max_ = np.amax(vol_)
+            min_ = np.amin(vol_)
+            y = [min_]
+            for i in range(days - 1):
+                if close_[i] > close_[i+1] and vol_[i] < vol_[i+1]:
+                    y.append(max_)
+                elif close_[i] < close_[i+1] and vol_[i] > vol_[i+1]:
                     y.append(max_)
                 else:
                     y.append(min_)
