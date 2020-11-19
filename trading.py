@@ -72,11 +72,14 @@ def check_stock_data(name):
 
     return (len(files) != 0)
 
-def get_stock_data(name):
+def get_stock_data(name, weekly):
     data = pd.DataFrame()
     end_date = api.daily().iloc[0]['trade_date']
     while True:
-        tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
+        if weekly:
+            tmp = api.weekly(ts_code=name, end_date=end_date)
+        else:
+            tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
         print("get data length: %d, end_date: %s" % (len(tmp), end_date))
         end_date = datetime.datetime.strptime(str(tmp.iloc[-1].trade_date), '%Y%m%d')
         delta = datetime.timedelta(days=1)
@@ -87,7 +90,7 @@ def get_stock_data(name):
 
     return data
 
-def get_index_data(name):
+def get_index_data(name, weekly):
     today = datetime.date.today().strftime("%Y%m%d")
     data = api.index_daily(ts_code=name)
     if str(data.iloc[0].trade_date) != today:
@@ -1188,7 +1191,7 @@ def plot_data(data, days, close, cols, filename, stock):
                 if close_[i] > close_[i+1] and vol_[i] < vol_[i+1]:
                     y.append(max_)
                 elif close_[i] < close_[i+1] and vol_[i] > vol_[i+1]:
-                    y.append(max_)
+                    y.append((max_ + min_) / 2.)
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
@@ -1530,6 +1533,77 @@ def filter_by_strategy10(data, days):
 
     return True
 
+'''
+ 1. 取价跌、量涨为信号
+'''
+def filter_by_strategy11(data, days):
+    # filter by vol
+    vol = data.iloc[0:days]['vol'].to_numpy()
+    close = data.iloc[0:days]['close'].to_numpy()
+    if not (vol[0] > vol[1] and close[0] < close[1]):
+        return False
+
+    # filter by adx14
+    adx = data.iloc[0:days]['adx14'].to_numpy()
+    max_ = np.amax(adx)
+    min_ = np.amin(adx)
+    if (adx[0] - min_) / (max_ - min_) > 0.1:
+        return False
+
+    return True
+
+'''
+ 1. 取价涨、量跌为信号
+'''
+def filter_by_strategy12(data, days):
+    # filter by vol
+    vol = data.iloc[0:days]['vol'].to_numpy()
+    close = data.iloc[0:days]['close'].to_numpy()
+    if not (vol[0] < vol[1] and close[0] > close[1]):
+        return False
+
+    # close 太高没有必要
+    max_ = np.amax(close)
+    min_ = np.amin(close)
+    if (close[0] - min_) / (max_ - min_) > 0.5:
+        return False
+
+    # normalize close
+    temp_close = data.iloc[0:days]['close'].to_numpy()
+    close_ = StandardScaler().fit_transform(temp_close.reshape(-1, 1)).flatten()
+    temp = data.iloc[0:days]['psar'].to_numpy()
+    psar_ = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    if close_[0] < psar_[0]:
+        return False
+
+    return True
+
+'''
+ 1. 取价涨、量跌为信号
+'''
+def filter_by_strategy13(data, days):
+    # filter by vol
+    vol = data.iloc[0:days]['vol'].to_numpy()
+    close = data.iloc[0:days]['close'].to_numpy()
+    if not (vol[0] < vol[1] and close[0] > close[1]):
+        return False
+
+    # close 太高没有必要
+    max_ = np.amax(close)
+    min_ = np.amin(close)
+    if (close[0] - min_) / (max_ - min_) > 0.5:
+        return False
+
+    # normalize close
+    temp_close = data.iloc[0:days]['close'].to_numpy()
+    close_ = StandardScaler().fit_transform(temp_close.reshape(-1, 1)).flatten()
+    temp = data.iloc[0:days]['psar'].to_numpy()
+    psar_ = StandardScaler().fit_transform(temp.reshape(-1, 1)).flatten()
+    if close_[0] > psar_[0]:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--stock', type=str)
@@ -1539,10 +1613,12 @@ if __name__ == "__main__":
     parser.add_argument('--random', action='store_true')
     parser.add_argument('--limit', type=int, default=-1)
     parser.add_argument('--plot_index', action='store_true')
+    parser.add_argument('--weekly', action='store_true')
     parser.set_defaults(mail_only=False)
     parser.set_defaults(not_filter=False)
     parser.set_defaults(random=False)
     parser.set_defaults(plot_index=False)
+    parser.set_defaults(weekly=False)
     args = parser.parse_args()
     print(args)
 
@@ -1573,14 +1649,14 @@ if __name__ == "__main__":
         for cand in candidates:
             print("index %d of %d" % (count, len(candidates)))
             print("getting data for %s" % cand)
-            if cand in stock_index:
-                data = get_index_data(cand)
-            else:
-                data = get_stock_data(cand)
-            data = data.dropna(axis=0)
             try:
+                if cand in stock_index:
+                    data = get_index_data(cand, args.weekly)
+                else:
+                    data = get_stock_data(cand, args.weekly)
+                data = data.dropna(axis=0)
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy10(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy13(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
