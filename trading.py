@@ -1033,6 +1033,15 @@ def plot_data(data, days, close, cols, filename, stock):
         elif 'vol' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
             sns.lineplot(x=x, y=vals, ax=ax[count])
+        elif 'gap' in col:
+            vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
+            vals2 = StandardScaler().fit_transform(vals2.reshape(-1, 1)).flatten()
+            sns.lineplot(x=x, y=vals2, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
+            vals = StandardScaler().fit_transform(vals.reshape(-1, 1)).flatten()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            max_ = max([np.amax(vals2), np.amax(vals)])
+            min_ = min([np.amin(vals2), np.amin(vals)])
         else:
             vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
             vals1 = StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten()
@@ -1114,10 +1123,24 @@ def plot_data(data, days, close, cols, filename, stock):
             vals = data.iloc[0:days].iloc[-1::-1]['boll_mavg%s' % day].to_numpy()
             sns.lineplot(x=x, y=vals, ax=ax[count])
             vals = data.iloc[0:days].iloc[-1::-1]['boll_hband%s' % day].to_numpy()
+            max_ = np.amax(vals)
             sns.lineplot(x=x, y=vals, ax=ax[count])
             vals = data.iloc[0:days].iloc[-1::-1]['boll_lband%s' % day].to_numpy()
+            min_ = np.amin(vals)
             sns.lineplot(x=x, y=vals, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', 'boll_mavg', 'boll_hband', 'boll_lband'], loc='upper left')
+            # gap
+            close_ = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+            high_ = data.iloc[0:days].iloc[-1::-1]['high'].to_numpy()
+            low_ = data.iloc[0:days].iloc[-1::-1]['low'].to_numpy()
+            # up gap
+            y = []
+            for i in range(days):
+                if (high_[i] - close_[i]) / (high_[i] - low_[i]) < 0.05:
+                    y.append(max_)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend(['ema5', close, 'boll_mavg', 'boll_hband', 'boll_lband', 'gap'], loc='upper left')
         elif 'boll_pband' in col:
             day = col.replace('boll_pband', '')
             vals = data.iloc[0:days].iloc[-1::-1]['boll_pband%s' % day].to_numpy()
@@ -1196,6 +1219,21 @@ def plot_data(data, days, close, cols, filename, stock):
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
             ax[count].legend(['vol', 'buy'], loc='upper left')
+        elif 'gap' in col:
+            close_ = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+            high_ = data.iloc[0:days].iloc[-1::-1]['high'].to_numpy()
+            low_ = data.iloc[0:days].iloc[-1::-1]['low'].to_numpy()
+            # up gap
+            y = []
+            for i in range(days):
+                if (high_[i] - close_[i]) / (high_[i] - low_[i]) < 0.05:
+                    y.append(max_)
+                elif (close_[i] - low_[i]) / (high_[i] - low_[i]) < 0.05:
+                    y.append((max_ + min_) / 2.)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend(['close', 'vol', 'gap'], loc='upper left')
         else:
             ax[count].legend([col, close, 'ema5'], loc='upper left')
         count += 1
