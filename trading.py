@@ -1694,7 +1694,7 @@ if __name__ == "__main__":
                     data = get_stock_data(cand, args.weekly)
                 data = data.dropna(axis=0)
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy13(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy6(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
