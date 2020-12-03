@@ -138,8 +138,13 @@ def calculate_index(days, K):
     r_top_K = []
     for day in open_cal:
         df = api.daily(trade_date=day)
-        amount = df.amount.sum()
-        df['weight'] = df['amount'] / amount * 100
+        df2 = api.daily_basic(trade_date=day)
+        df = df[df.ts_code.isin(df2.ts_code.tolist())]
+        df = df.sort_values('ts_code').reset_index()
+        df2 = df2.sort_values('ts_code').reset_index()
+        df['circ_mv'] = df2['circ_mv']
+        amount = df.circ_mv.sum()
+        df['weight'] = df['circ_mv'] / amount * 100
         df['open'] = df['open'] * df['weight']
         df['high'] = df['high'] * df['weight']
         df['low'] = df['low'] * df['weight']
@@ -187,7 +192,7 @@ def plot_index(df, top_K, savefile):
     style = mpf.make_mpf_style(base_mpf_style='nightclouds', marketcolors=mc)
     wconfig = dict()
     apdict = mpf.make_addplot(df[['BollHBand', 'BollLBand', 'BollMAvg']])
-    mpf.plot(df, type='ohlc', volume=True, style=style, title='Chives Index', return_width_config=wconfig, ylabel='Index', figscale=1.5, tight_layout=True, addplot=apdict, scale_width_adjustment=dict(lines=0.7))
+    mpf.plot(df, type='ohlc', volume=True, style=style, title='Stock A Index', return_width_config=wconfig, ylabel='Index', figscale=1.5, tight_layout=True, addplot=apdict, scale_width_adjustment=dict(lines=0.7))
     print(wconfig)
     plt.savefig(savefile)
     plt.close('all')
