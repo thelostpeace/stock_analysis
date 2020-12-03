@@ -136,6 +136,7 @@ def calculate_index(days, K):
     amount_ = []
     top_K = []
     r_top_K = []
+    w_top_K = []
     for day in open_cal:
         df = api.daily(trade_date=day)
         df2 = api.daily_basic(trade_date=day)
@@ -156,6 +157,9 @@ def calculate_index(days, K):
         close_.append(df.close.sum())
         vol_.append(df.vol.sum() / 10000.)
         amount_.append(df.amount.sum() / 100000.)
+        cand = df.sort_values('weight', ascending=False).iloc[:K][['ts_code', 'weight']].to_numpy()
+        top_ = ["%s%+.3f%%" % (code2name[item[0]], item[1]) for item in cand]
+        w_top_K.append(top_)
         cand = df.sort_values('close', ascending=False).iloc[:K][['ts_code', 'pct_chg']].to_numpy()
         top_ = ["%s%+.2f%%" % (code2name[item[0]], item[1]) for item in cand]
         top_K.append(top_)
@@ -183,7 +187,7 @@ def calculate_index(days, K):
     data['BollLBand'] = bb.bollinger_lband()
     data['BollMAvg'] = bb.bollinger_mavg()
 
-    return data.iloc[20:], (top_K, r_top_K)
+    return data.iloc[20:], (top_K, r_top_K, w_top_K)
 
 def plot_index(df, top_K, savefile):
     df['Date'] = df['Date'].astype('datetime64[ns]')
@@ -206,6 +210,7 @@ def plot_index(df, top_K, savefile):
     print('volume: %.2f万手' % df.iloc[-1]['Volume'])
     print('amount: %.2f亿' % df.iloc[-1]['Amount'])
     print('percent change: %+.2f%%' % ((df.iloc[-1]['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100.))
+    print("权重占比前十: %s" % ' '.join(top_K[2][0]))
     print('指数占比前十: %s' % ' '.join(top_K[0][0]))
     print('指数占比倒数前十: %s' % ' '.join(top_K[1][0]))
 
