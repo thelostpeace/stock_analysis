@@ -80,7 +80,7 @@ def get_stock_data(name, weekly):
             tmp = api.weekly(ts_code=name, end_date=end_date)
         else:
             tmp = ts.pro_bar(ts_code=name, api=api, end_date=end_date, adj='qfq')
-        print("get data length: %d, end_date: %s" % (len(tmp), end_date))
+        print("get data length: %d, end_date: %s last trade day: %s" % (len(tmp), end_date, tmp.iloc[0].trade_date))
         end_date = datetime.datetime.strptime(str(tmp.iloc[-1].trade_date), '%Y%m%d')
         delta = datetime.timedelta(days=1)
         end_date = (end_date - delta).strftime("%Y%m%d")
@@ -1035,7 +1035,7 @@ def plot_data(data, days, close, cols, filename, stock):
     if not isinstance(ax, np.ndarray):
         ax = [ax]
     for col in cols:
-        if 'ema' in col or 'boll_band' in col:
+        if 'ema' in col or 'boll_band' in col or 'pct_chg' in col:
             vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
             vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
             sns.lineplot(x=x, y=vals3, ax=ax[count])
@@ -1244,6 +1244,24 @@ def plot_data(data, days, close, cols, filename, stock):
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
             ax[count].legend(['close', 'vol', 'gap'], loc='upper left')
+        elif 'pct_chg' in col:
+            close_ = data.iloc[0:days].iloc[-1::-1]['close'].to_numpy()
+            change_ = data.iloc[0:days].iloc[-1::-1]['pct_chg'].to_numpy()
+            high_ = data.iloc[0:days].iloc[-1::-1]['high'].to_numpy()
+            low_ = data.iloc[0:days].iloc[-1::-1]['low'].to_numpy()
+            open_ = data.iloc[0:days].iloc[-1::-1]['open'].to_numpy()
+            max_ = np.amax(close_)
+            min_ = np.amin(close_)
+            y = []
+            for i in range(days):
+                if change_[i] > 8.:
+                    y.append(max_)
+                elif abs(close_[i] - open_[i]) / (high_[i] - low_[i]) < 0.05:
+                    y.append((max_ + min_) / 2.)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend(['ema5', 'close', 'change'], loc='upper left')
         else:
             ax[count].legend([col, close, 'ema5'], loc='upper left')
         count += 1
