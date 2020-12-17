@@ -543,7 +543,7 @@ def add_vwap_info(data):
 
 def add_atr_info(data):
     new_data = data.reset_index(drop=True)
-    days = [2,5,10,15,20,30]
+    days = [2,5,10,15,20,30,14]
     for day in days:
         atr = ta.volatility.AverageTrueRange(high=new_data.iloc[-1::-1].high, low=new_data.iloc[-1::-1].low, close=new_data.iloc[-1::-1].close, n=day)
         col = "atr%d" % day
@@ -1052,16 +1052,20 @@ def plot_data(data, days, close, cols, filename, stock):
             sns.lineplot(x=x, y=vals, ax=ax[count])
             max_ = max([np.amax(vals2), np.amax(vals)])
             min_ = min([np.amin(vals2), np.amin(vals)])
+        elif 'boll_pband' in col or 'adx' in col:
+            vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
+            max_ = np.amax(vals1)
+            min_ = np.amin(vals1)
+            sns.lineplot(x=x, y=vals1, ax=ax[count])
         else:
             vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
-            vals1 = StandardScaler().fit_transform(vals1.reshape(-1,1)).flatten()
             max_ = np.amax(vals1)
             min_ = np.amin(vals1)
             vals2 = data.iloc[0:days].iloc[-1::-1][close].to_numpy()
             vals3 = data.iloc[0:days].iloc[-1::-1]['ema5'].to_numpy()
             sns.lineplot(x=x, y=vals1, ax=ax[count])
-            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals2.reshape(-1,1)).flatten(), ax=ax[count])
-            sns.lineplot(x=x, y=StandardScaler().fit_transform(vals3.reshape(-1,1)).flatten(), ax=ax[count])
+            sns.lineplot(x=x, y=vals2, ax=ax[count])
+            sns.lineplot(x=x, y=vals3, ax=ax[count])
 
         if 'cmf' in col:
             vals = data.iloc[0:days].iloc[-1::-1]['adi'].to_numpy()
@@ -1074,11 +1078,9 @@ def plot_data(data, days, close, cols, filename, stock):
         elif 'adx' in col:
             day = col.replace('adx', '')
             pos_ = data.iloc[0:days].iloc[-1::-1]['adx_pos%s' % day].to_numpy()
-            pos_ = StandardScaler().fit_transform(pos_.reshape(-1,1)).flatten()
             max_ = np.amax(pos_)
             sns.lineplot(x=x, y=pos_, ax=ax[count])
             neg_ = data.iloc[0:days].iloc[-1::-1]['adx_neg%s' % day].to_numpy()
-            neg_ = StandardScaler().fit_transform(neg_.reshape(-1,1)).flatten()
             min_ = np.amin(neg_)
             sns.lineplot(x=x, y=neg_, ax=ax[count])
             # scatter plot
@@ -1102,7 +1104,7 @@ def plot_data(data, days, close, cols, filename, stock):
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
-            ax[count].legend([col, close, 'ema5', '+DMI', '-DMI', 'buy', 'signal'], loc='upper left')
+            ax[count].legend([col, '+DMI', '-DMI', 'buy', 'signal'], loc='upper left')
         elif 'vi_diff' in col:
             day = col.replace('vi_diff', '')
             pos_ = data.iloc[0:days].iloc[-1::-1]['vi_pos%s' % day].to_numpy()
@@ -1225,6 +1227,18 @@ def plot_data(data, days, close, cols, filename, stock):
                     y.append(max_)
                 elif close_[i] < close_[i+1] and vol_[i] > vol_[i+1]:
                     y.append((max_ + min_) / 2.)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend(['vol', 'buy'], loc='upper left')
+        elif 'test' in col:
+            vol_ = data.iloc[0:days].iloc[-1::-1]['vol'].to_numpy()
+            max_ = np.amax(vol_)
+            min_ = np.amin(vol_)
+            y = []
+            for i in range(days):
+                if (vol_[i] - min_) / (max_ - min_) > 0.8:
+                    y.append(max_)
                 else:
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
@@ -1670,6 +1684,32 @@ def filter_by_strategy13(data, days):
 
     return True
 
+'''
+ 1. 按照return来看敏感度
+'''
+def filter_by_strategy14(data, days):
+    day_return = data.iloc[0:days]['pct_chg'].to_numpy()
+    var = np.var(day_return)
+    if var < 30.:
+        return False
+
+    return True
+
+'''
+ 1. short-swing trading, 选出的全是垃圾
+'''
+def filter_by_strategy15(data, days):
+    # filter by ADX
+    adx_flag = False
+    adx_pos = data.iloc[0:days]['adx_pos14'].to_numpy()
+    adx_neg = data.iloc[0:days]['adx_neg14'].to_numpy()
+    if adx_pos[0] > adx_neg[0] and adx_pos[1] < adx_neg[1]:
+        adx_flag = True
+    if not adx_flag:
+        return False
+
+    return True
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--stock', type=str)
@@ -1722,7 +1762,7 @@ if __name__ == "__main__":
                     data = get_stock_data(cand, args.weekly)
                 data = data.dropna(axis=0)
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy6(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy15(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
@@ -1742,3 +1782,4 @@ if __name__ == "__main__":
         #send_mail(args.mail)
     else:
         send_mail(args.mail)
+
