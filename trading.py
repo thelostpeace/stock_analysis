@@ -946,6 +946,22 @@ def add_mfi_info(data):
 
     return new_data
 
+# support and resistance
+def add_sr_info(data):
+    new_data = data.reset_index(drop=True)
+    ema_v = ta.utils.ema(new_data.iloc[-1::-1]['vol'], periods=5)
+    ema_p = ta.utils.ema(new_data.iloc[-1::-1]['close'], periods=5)
+    sr = [v * p for v, p in zip(ema_v, ema_p)]
+    new_data['sup_res'] = sr[-1::-1]
+
+    boll = ta.volatility.BollingerBands(close=new_data.iloc[-1::-1]['sup_res'])
+    new_data['sup_res_h'] = boll.bollinger_hband()
+    new_data['sup_res_l'] = boll.bollinger_lband()
+    new_data['sup_res_mavg'] = boll.bollinger_mavg()
+    new_data['sup_res_p'] = boll.bollinger_pband()
+
+    return new_data
+
 def add_features(data):
     new_data = data.reset_index(drop=True)
     # previous day info
@@ -1024,6 +1040,8 @@ def add_features(data):
     #new_data = add_cr_info(new_data)
     # money flow index
     #new_data = add_mfi_info(new_data)
+    # support and resistance
+    new_data = add_sr_info(new_data)
 
     return new_data
 
@@ -1052,7 +1070,7 @@ def plot_data(data, days, close, cols, filename, stock):
             sns.lineplot(x=x, y=vals, ax=ax[count])
             max_ = max([np.amax(vals2), np.amax(vals)])
             min_ = min([np.amin(vals2), np.amin(vals)])
-        elif 'boll_pband' in col or 'adx' in col:
+        elif 'boll_pband' in col or 'adx' in col or 'sup_res' in col:
             vals1 = data.iloc[0:days].iloc[-1::-1][col].to_numpy()
             max_ = np.amax(vals1)
             min_ = np.amin(vals1)
@@ -1153,6 +1171,24 @@ def plot_data(data, days, close, cols, filename, stock):
                     y.append(min_)
             sns.scatterplot(x=x, y=y, ax=ax[count])
             ax[count].legend(['ema5', close, 'boll_mavg', 'boll_hband', 'boll_lband', 'gap'], loc='upper left')
+        elif 'sup_res' in col:
+            vals = data.iloc[0:days].iloc[-1::-1]['sup_res_mavg'].to_numpy()
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['sup_res_h'].to_numpy()
+            max_ = np.amax(vals)
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            vals = data.iloc[0:days].iloc[-1::-1]['sup_res_l'].to_numpy()
+            min_ = np.amin(vals)
+            sns.lineplot(x=x, y=vals, ax=ax[count])
+            pband = data.iloc[0:days].iloc[-1::-1]['sup_res_p'].to_numpy()
+            y = []
+            for i in range(days):
+                if pband[i] < 0.1:
+                    y.append(max_)
+                else:
+                    y.append(min_)
+            sns.scatterplot(x=x, y=y, ax=ax[count])
+            ax[count].legend([col, 'mavg', 'hband', 'lband', 'buy'], loc='upper left')
         elif 'boll_pband' in col:
             day = col.replace('boll_pband', '')
             vals = data.iloc[0:days].iloc[-1::-1]['boll_pband%s' % day].to_numpy()
@@ -1696,9 +1732,19 @@ def filter_by_strategy14(data, days):
     return True
 
 '''
- 1. short-swing trading, 选出的全是垃圾
+ 1. daily filter
 '''
 def filter_by_strategy15(data, days):
+    sr_pband = data.iloc[0:days]['sup_res_p'].to_numpy()
+    if sr_pband[0] > 0.1:
+        return False
+
+    return True
+
+'''
+ 1. weekly filter
+'''
+def filter_by_strategy16(data, days):
     # filter by ADX
     adx_flag = False
     adx_pos = data.iloc[0:days]['adx_pos14'].to_numpy()
@@ -1762,12 +1808,12 @@ if __name__ == "__main__":
                     data = get_stock_data(cand, args.weekly)
                 data = data.dropna(axis=0)
                 data = add_features(data)
-                if cand not in stock_index and not args.not_filter and not filter_by_strategy15(data, days):
+                if cand not in stock_index and not args.not_filter and not filter_by_strategy16(data, days):
                     print("filter %s by strategy!!!" % cand)
                     continue
                 png = "pattern/%s.png" % cand
                 print("plotting picture for %s" % cand)
-                plot_data(data, days, 'close', ['ema5', 'vol', 'psar', 'adx14', 'boll_pband20', 'boll_band20'], png, cand)
+                plot_data(data, days, 'close', ['ema5', 'vol', 'psar', 'adx14', 'boll_pband20', 'boll_band20', 'sup_res'], png, cand)
                 print("="*20, "DONE", "="*20)
                 limit += 1
                 if args.limit != -1 and limit >= args.limit:
