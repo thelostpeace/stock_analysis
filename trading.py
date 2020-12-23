@@ -1748,13 +1748,10 @@ def filter_by_strategy15(data, days):
  1. weekly filter
 '''
 def filter_by_strategy16(data, days):
-    # filter by ADX
-    adx_flag = False
-    adx_pos = data.iloc[0:days]['adx_pos14'].to_numpy()
-    adx_neg = data.iloc[0:days]['adx_neg14'].to_numpy()
-    if adx_pos[0] > adx_neg[0] and adx_pos[1] < adx_neg[1]:
-        adx_flag = True
-    if not adx_flag:
+    # normalize close
+    close_ = data.iloc[0:days]['close'].to_numpy()
+    psar_ = data.iloc[0:days]['psar'].to_numpy()
+    if close_[0] > psar_[0]:
         return False
 
     return True
