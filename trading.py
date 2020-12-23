@@ -949,10 +949,13 @@ def add_mfi_info(data):
 # support and resistance
 def add_sr_info(data):
     new_data = data.reset_index(drop=True)
-    ema_v = ta.utils.ema(new_data.iloc[-1::-1]['vol'], periods=5)
-    ema_p = ta.utils.ema(new_data.iloc[-1::-1]['close'], periods=5)
-    sr = [v * p for v, p in zip(ema_v, ema_p)]
-    new_data['sup_res'] = sr[-1::-1]
+    v = new_data['vol'].to_numpy()
+    p = new_data['close'].to_numpy()
+    h = new_data['high'].to_numpy()
+    l = new_data['low'].to_numpy()
+    avg = (p + h + l) / 3.
+    sr = [v * p for v, p in zip(v, avg)]
+    new_data['sup_res'] = sr
 
     boll = ta.volatility.BollingerBands(close=new_data.iloc[-1::-1]['sup_res'])
     new_data['sup_res_h'] = boll.bollinger_hband()
