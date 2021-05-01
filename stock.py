@@ -32,7 +32,7 @@ def check_stock_data(name):
     return (len(files) != 0)
 
 def get_stock_data(name, store_file):
-    api = ts.pro_api(token='9a29d45bfd6a127f24365620f9bb730f557abaacff59656b0218b843')
+    api = ts.pro_api(token='your tushare token')
     today = datetime.date.today()
     if check_stock_data(store_file):
         data = pd.read_csv(store_file)
