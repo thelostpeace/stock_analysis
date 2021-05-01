@@ -1,5 +1,7 @@
 # stock_analysis
 
+**2021-05-01留：经过很长时间的研究之后决定公开这些杂乱的代码，当然这些代码已经不是最新的了，是不是最新的也不重要了。总的来说，A股是没有什么规律可言的，很多指标都只是一个参考而已，在研究各种指标的过程中，结合实盘和历史数据，你会对A股有越来越深的认知。如果这些杂乱的代码都够帮助你尽快开始实验，那便达到了它的目的，如果说你想用里面的一些策略去盈利，那是不可能的，因为A股是没有规律可言的，反而处处是陷阱。对于A股而言，你要认清里面的角色，有股东、有机构、有大游资、更有成群的散户。A股是一个纯粹的博弈游戏，要想在这个游戏中取得胜利，你要先明白一个道理：股价是大家合力做上去的，明白了这一点之后，你要学着去站队，学着去规避风险减少回撤保住利润。散户想要在A股里赚快钱，只有一条路，那便是利用散户的优势：船小好掉头。一路研究下来，A股确实是一个有意思的地方，但是还是建议你远离A股，它是一个吃人不吐骨头的地方，是一个费神费力费钱的地方，更是一个尔虞我诈的地方。如果你一定要玩玩A股，感受一下博弈的乐趣，建议不要投入超过10%的资金在里面，大胆去做，盈亏都无所谓。最后，祝君玩的开心，也愿君能大赚！**
+
 **请不要用我的token，注册tushare-pro可以获取免费token：[tushare-pro](https://tushare.pro/register?reg=393010)**
 
  - 2020-09-21 update: add ema info, both **sma(simple moving average)** and **ema(exponential moving average)**. it seems that ema is more sensitive than sma for ema weighting more on recent prices. for short-swing trading, you should focus on short period ema crossover, because the crossovers tell you the trends. especially shorter period ema breaking through longer period ema upward is a strong signal that the price of this stock is going up and it is time to hold this stock and wait for a right time to sell. but the buy time is earlier than this crossover. and it seems that 100-day ema is very important, maybe because 100 days is near the market cycle? the feature importance just implies this conclusion.
