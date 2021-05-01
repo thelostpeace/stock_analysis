@@ -27,7 +27,7 @@ stock_index = ['000001.SH']
 code2name = dict()
 
 predict_days = 5
-api = ts.pro_api(token='6fd0d52251fd78f819527832d0ad920feea9acd672d7f296a02efea3')
+api = ts.pro_api(token='your tushare token')
 
 trading_note = """
 本邮件由程序自动发送，勿回复，谢谢！
